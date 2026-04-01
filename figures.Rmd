@@ -1,0 +1,3656 @@
+---
+title: "Lundie-Brown et al 2026"
+output: html_notebook
+---
+
+This code is for producing the publication figures in Lundie-Brown et al., 2026
+
+Preprocessing objects are found in other R markdown files and details of required output objects are given here: 
+
+
+RNAseq experiment 1: 
+ 
+  RNAseq_ASCL1_dds.Rds - DESeq2 object 
+  RNAseq_ASCL1_DEGs.csv - sheet of degs and which condtion / timepoint they are upregulated in 
+  RNAseq_ASCL1_zmtrx.txt - z-scored expression matrix 
+
+ChIPseq experiment 1: 
+ATACseq experiment 1: 
+
+  ATACseq_analysed_RLE.Rds - analysed diffbind object for the ATAC-seq data 
+  
+RNAseq experiment 2: 
+RNAseq experiment 3: 
+
+
+# FIG 1 
+
+Fig 1F - PCA plot
+
+```{r, messages=FALSE}
+
+library(here)
+library(tidyverse)
+library(DESeq2)
+library(ggplot2)
+library(PCAtools)
+
+# load in the dds object
+
+dds <- readRDS(here("../Data/RNAseq_ASCL1_dds.Rds"))
+
+# calculating the pca plot and variance stabilised data
+
+rna_vsd <- assay(vst(dds, blind=FALSE))
+
+rna_pca <- pca(rna_vsd, metadata = colData(dds), removeVar = 0.95) # takes just top 5% variable genes 
+
+# plot pca 1 versus 2 (Figu 2B) based on top 5% of variable genes
+
+rna_pcaRot <- rna_pca$rotated[,c(1:3)]
+rna_pcaRot <- cbind(rna_pcaRot, Group = rna_pca$metadata$Group)
+rna_pcaPcntVar <- round(rna_pca$variance)
+
+colours <- list("C11_mESC_t24" = "lightgrey", "C11_EpiLC_t24" = "lightgrey", "C11_NE_t24" = "lightgrey",
+                "gG5_mESC_t0" = "#AAE4E9", "gG5_mESC_t6" = "#79C9D1", "gG5_mESC_t24" = "#4FAAB2",
+                "gG5_EpiLC_t0" = "#FFE8B9", "gG5_EpiLC_t6" = "#FFDC92", "gG5_EpiLC_t24" = "#FFD170",
+                "gG5_NE_t0" = "#FFBCB9", "gG5_NE_t6" = "#FF9792", "gG5_NE_t24" = "#FF7770")
+
+
+rna_pcaFig12 <- ggplot(rna_pcaRot, aes(PC1, PC2, colour = Group)) + 
+  geom_point(size = 3) +
+  xlab(paste0("PC1: ",rna_pcaPcntVar[1],"% variance")) +
+  ylab(paste0("PC2: ",rna_pcaPcntVar[2],"% variance")) +
+  scale_colour_manual(values = unlist(colours), guide = "none") + 
+  theme_bw()
+
+rna_pcaFig12
+
+png(here("../Figures/Fig1F.png"), width = 1000, height = 1000, res = 300)
+print(rna_pcaFig12)
+dev.off()
+
+
+# rna_pcaFig23 <- ggplot(rna_pcaRot, aes(PC2, PC3, colour = Group)) + 
+#   geom_point(size = 3) +
+#   xlab(paste0("PC2: ",rna_pcaPcntVar[2],"% variance")) +
+#   ylab(paste0("PC3: ",rna_pcaPcntVar[3],"% variance")) +
+#   scale_colour_manual(values = unlist(colours), guide = "none") +
+#   theme_bw()
+
+# png(here("../Figures/FigS2A.png"), width = 1000, height = 1000, res = 300)
+# print(rna_pcaFig23)
+# dev.off()
+
+```
+
+Fig 1G - how many DEGs after ASCL1 in each cell type at 6 and 24 hours
+
+```{r, messages=FALSE}
+
+library(here)
+library(tidyverse)
+library(ggplot2)
+
+degs <- read.csv(file = here("../Data/RNAseq_ASCL1_DEGs.csv"))
+
+
+plotdat <- data.frame(
+  cond = factor(c("mESC_t6", "mESC_t24", "EpiLC_t6", "EpiLC_t24", "NE_t6", "NE_t24"), levels = c("mESC_t6", "mESC_t24", "EpiLC_t6", "EpiLC_t24", "NE_t6", "NE_t24")),
+  up = c(sum(degs$mESC_t6_gg5_change == "up"),
+         sum(degs$mESC_t24_gg5_change == "up"),
+         sum(degs$EpiLC_t6_gg5_change == "up"),
+         sum(degs$EpiLC_t24_gg5_change == "up"),
+         sum(degs$NE_t6_gg5_change == "up"),
+         sum(degs$NE_t24_gg5_change == "up")),
+  down = c(sum(degs$mESC_t6_gg5_change == "down"),
+         sum(degs$mESC_t24_gg5_change == "down"),
+         sum(degs$EpiLC_t6_gg5_change == "down"),
+         sum(degs$EpiLC_t24_gg5_change == "down"),
+         sum(degs$NE_t6_gg5_change == "down"),
+         sum(degs$NE_t24_gg5_change == "down")))
+
+
+plotdat_long <- plotdat %>%
+  tidyr::pivot_longer(cols = c(up, down), names_to = "direction", values_to = "count") %>%
+  dplyr::mutate(count = ifelse(direction == "down", -count, count))
+
+
+p = ggplot(plotdat_long, aes(x = cond, y = count, fill = cond, group = direction)) +
+  geom_col(show.legend = FALSE, position = position_dodge(width = 0.9), width = 0.7) +
+  geom_hline(yintercept = 0, colour = "black") +
+  scale_fill_manual(values = c("mESC_t6" = "#76C9D1", 
+                               "mESC_t24" = "#4FAAB2", 
+                               "EpiLC_t6" = "#FFDC92", 
+                               "EpiLC_t24" = "#FFD170", 
+                               "NE_t6" = "#FF9792", 
+                               "NE_t24" = "#FF7770")) +
+  labs(x = NULL, y = "Number of DEGs") +
+  theme_bw() +
+  theme(axis.text.x = element_blank())
+
+p
+
+ggsave(plot = p, filename = here("../Figures/Fig1G.png"), height = 4, width = 4, dpi = 300)
+
+```
+
+Fig 1H - venn diagram of DEGs up at 24 hours 
+
+```{r, messages=FALSE}
+
+library(here)
+library(tidyverse)
+library(eulerr)
+
+# venn diagram 24 hour 
+
+euler_24h <- eulerr::euler(list(
+  "mESC 24h Dex" = degs %>% dplyr::filter(mESC_t24_gg5_change == "up") %>% pull(symbol),
+  "EpiLC 24h Dex" = degs %>% dplyr::filter(EpiLC_t24_gg5_change == "up") %>% pull(symbol),
+  "NE 24h Dex" = degs %>% dplyr::filter(NE_t24_gg5_change == "up") %>% pull(symbol)
+))
+
+
+colours_t24 <- c("#4FAAB2", "#FFD170", "#FF7770")
+
+
+t24 <- plot(euler_24h,
+            fill = colours_t24,
+            edges = list(col = "black"),
+            quantities = TRUE)
+
+t24
+
+ggsave(here("../Figures/Fig1H.png"), t24, width = 4, height = 4, dpi = 300)
+
+```
+
+Fig 1I - heatmap of all upregulated DEGs across conditions 
+
+```{r, messages=FALSE}
+
+library(here)
+library(tidyverse)
+library(DESeq2)
+library(ComplexHeatmap)
+library(MetBrewer)
+
+# colours for plotting 
+
+colours <- c("C11_mESC_t24" = "lightgrey", "C11_EpiLC_t24" = "lightgrey", "C11_NE_t24" = "lightgrey",
+             "gG5_mESC_t0" = "#AAE4E9","gG5_mESC_t6" = "#79C9D1","gG5_mESC_t24" = "#4FAAB2",
+             "gG5_EpiLC_t0" = "#FFE8B9","gG5_EpiLC_t6" = "#FFDC92","gG5_EpiLC_t24" = "#FFD170",
+             "gG5_NE_t0" = "#FFBCB9","gG5_NE_t6" = "#FF9792","gG5_NE_t24" = "#FF7770")
+
+
+# load in the z-scored matrix 
+
+vst.zmtrx <- read.table(file = here("../Data/RNAseq_ASCL1_zmtrx.txt"), row.names = 1) %>% as.matrix()
+
+# determine a list of genes to plot from the total deg list and filter the heatmap matrix 
+
+degs <- read.csv(file = here("../Data/RNAseq_ASCL1_DEGs.csv"))
+
+degs_t24 <- degs %>% dplyr::filter(mESC_t24_gg5_change == "up" | EpiLC_t24_gg5_change == "up" | NE_t24_gg5_change == "up") %>% pull(symbol)
+
+vst.zmtrx.24degs <- vst.zmtrx[rownames(vst.zmtrx) %in% degs_t24, ]
+
+
+# prepare annotation using colnames and dds object 
+
+dds <- readRDS(here("../Data/RNAseq_ASCL1_dds.Rds"))
+
+col_annotation <- colData(dds)[colnames(vst.zmtrx), "Group"]
+
+heatmap_annotation_head <- HeatmapAnnotation(Condition = col_annotation,
+                                             col = list(Condition = colours),
+                                             show_legend = FALSE,
+                                             show_annotation_name = FALSE
+                                             )
+
+# prepare a row split factor 
+
+split_order <- c("all_three", "mesc_only", "mesc_epilc", "epilc_only", "epilc_ne", "ne_only", "mesc_ne")
+
+row_split <- factor(
+  degs$t24up_group[match(rownames(vst.zmtrx.24degs), degs$symbol)],
+  levels = split_order
+)
+
+# Count how many genes are in each category
+split_counts <- table(row_split)
+
+# Create new labels like "only_mESC (37 genes)"
+split_labels <- paste0(names(split_counts), "\n (", split_counts, " genes)")
+
+# Assign the labels as levels
+levels(row_split) <- split_labels
+
+
+# make gene name annotations 
+
+slct_genes <- c("Tnni2", "Vgll1", "Esx1", "Dppa1", "Cebpa", "Cebpb", "Sync", "Eno3", "Dll3", "Id1", "Id3", "Hes5",
+                "Plxna2", "Wnt5a", "Tubb3", "Map2", "Isl1", "Phox2a", "Myt1", "Elavl4", "Ank2", "Gsx2", "Sox10", "Sox11", "Sox3", "Onecut2", "Onecut1", "Dcx")
+
+
+mark_index <- which(rownames(vst.zmtrx.24degs) %in% slct_genes)
+mark_labels <- rownames(vst.zmtrx.24degs)[mark_index]
+
+right_annot <- rowAnnotation(
+  gene = anno_mark(
+    at = mark_index,
+    labels = mark_labels,
+    labels_gp = gpar(fontsize = 20),
+    link_width = unit(8, "mm"),       # distance between heatmap & labels
+    padding = unit(1, "mm")
+  )
+)
+
+# Generate the heatmap
+heatmap_obj <- Heatmap(
+  name = "z-scored expression",
+  vst.zmtrx.24degs,
+  col = met.brewer("OKeeffe1", direction = -1),
+  cluster_columns = FALSE,
+  show_row_dend = FALSE,
+  show_row_names = FALSE,
+  show_column_names = FALSE,
+  top_annotation = heatmap_annotation_head,
+  row_split = row_split,
+  row_title_gp = gpar(fontsize = 5, fontface = "bold"),
+  cluster_row_slices = FALSE,
+  heatmap_legend_param = list(legend_direction = "horizontal")
+)
+
+# add text labels 
+heatmap_wlabels <- heatmap_obj + right_annot
+
+draw(heatmap_wlabels, heatmap_legend_side = "bottom")
+
+# export the plot 
+png(file = here("../Figures/Fig1I.png"), width = 6, height = 10, units = "in", res = 300)
+draw(heatmap_wlabels, heatmap_legend_side = "bottom")
+dev.off()
+
+```
+
+Fig 1J–L - GO analysis and plots of upregulated DEGs at 24 hours 
+
+```{r, messages=FALSE}
+
+library(here)
+library(tidyverse)
+library(ggplot2)
+library(clusterProfiler)
+library(org.Mm.eg.db)
+library(cowplot)
+
+degs <- read.csv(file = here("../Data/RNAseq_ASCL1_DEGs.csv"))
+
+# plot top 5 enriched (& simplified) GO terms for upregulated genes at 24 hours in each cell type - not clustered, so some genes will be shared between conditions 
+
+mesc_up <- degs %>%
+  dplyr::filter(mESC_t24_gg5_change == "up") %>%
+  pull(symbol)
+
+go_mesc <- enrichGO(
+  gene          = mesc_up,
+  OrgDb         = org.Mm.eg.db,
+  keyType       = "SYMBOL",    
+  ont           = "BP",
+  pAdjustMethod = "BH",
+  pvalueCutoff  = 0.05,
+  qvalueCutoff  = 0.2)
+
+smp_mesc <- simplify(go_mesc)
+
+p_mesc <- barplot(smp_mesc, showCategory = 5) + theme_cowplot() + scale_y_discrete(labels = function(x) str_wrap(x, width = 15)) +
+  scale_fill_gradient(high = "#AAE4E9", low = "#79C9D1")
+
+p_mesc
+
+ggsave(plot = p_mesc, filename = here("../Figures/Fig1J-2.png"), width = 3.5, height = 4, dpi = 300, bg = "white")
+  
+
+
+epilc_up <- degs %>%
+  dplyr::filter(EpiLC_t24_gg5_change == "up") %>%
+  pull(symbol)
+
+go_epilc <- enrichGO(
+  gene          = epilc_up,
+  OrgDb         = org.Mm.eg.db,
+  keyType       = "SYMBOL",    
+  ont           = "BP",
+  pAdjustMethod = "BH",
+  pvalueCutoff  = 0.05,
+  qvalueCutoff  = 0.2)
+
+smp_epilc <- simplify(go_epilc)
+
+p_epilc <- barplot(smp_epilc, showCategory = 5) + theme_cowplot() + scale_y_discrete(labels = function(x) str_wrap(x, width = 18)) +
+  scale_fill_gradient(high = "#FFE8B9", low = "#FFDC92")
+
+p_epilc
+
+ggsave(plot = p_epilc, filename = here("../Figures/Fig1K-2.png"), width = 3.5, height = 4, dpi = 300, bg = "white")
+
+
+
+ne_up <- degs %>%
+  dplyr::filter(NE_t24_gg5_change == "up") %>%
+  pull(symbol)
+
+go_ne <- enrichGO(
+  gene          = ne_up,
+  OrgDb         = org.Mm.eg.db,
+  keyType       = "SYMBOL",    
+  ont           = "BP",
+  pAdjustMethod = "BH",
+  pvalueCutoff  = 0.05,
+  qvalueCutoff  = 0.2)
+
+smp_ne <- simplify(go_ne)
+
+p_ne <- barplot(smp_ne, showCategory = 5) + theme_cowplot() + scale_y_discrete(labels = function(x) str_wrap(x, width = 15)) +
+  scale_fill_gradient(high = "#FFBCB9", low = "#FF9792")
+
+p_ne
+
+ggsave(plot = p_ne, filename = here("../Figures/Fig1L-2.png"), width = 3.5, height = 4, dpi = 300, bg = "white")
+
+```
+
+
+# FIG S1
+
+Fig S1I–K - volcano plots of DEGs after 24 hours ASCL1 in each condition 
+
+```{r, messages=FALSE}
+
+# note the log fold change is shrunk using ashr, represents the comparison against t0 gg5, but changes are filtered to be also significant in the vs c11 comparison 
+
+library(here)
+library(tidyverse)
+library(ggplot2)
+library(ggrepel)
+
+degs <- read.csv(file = here("../Data/RNAseq_ASCL1_DEGs.csv"))
+
+#----------------------------------#
+# define the volcano plot function #
+#----------------------------------#
+
+plotVolcano <- function(degs, contrast_prefix,
+                        x_lim = c(-10, 10),
+                        y_lim = c(0, 80),
+                        upcolour = "#76C9D1",
+                        nscolour = "grey80",
+                        downcolour = "grey30",
+                        top_n = 10) {
+  
+  # build column names based on prefix
+  lfc_col <- paste0(contrast_prefix, "_ashrLFC")
+  padj_col <- paste0(contrast_prefix, "_padj")
+  change_col <- paste0(contrast_prefix, "_change")
+  
+  # prepare plot data
+  plotdat <- degs %>%
+    dplyr::mutate(
+      lfc = !!rlang::sym(lfc_col),
+      log_padj = -log10(!!rlang::sym(padj_col)),
+      change = factor(!!rlang::sym(change_col), levels = c("up", "ns", "down")),
+      oob_x = lfc < x_lim[1] | lfc > x_lim[2],
+      oob_y = log_padj < y_lim[1] | log_padj > y_lim[2]
+    ) %>%
+    dplyr::select(symbol, lfc, log_padj, change, oob_x, oob_y)
+  
+  # top N inside-bound genes
+  top_genes <- plotdat %>%
+    dplyr::filter(!(oob_x | oob_y)) %>%
+    dplyr::arrange(desc(abs(log_padj))) %>%
+    dplyr::slice_head(n = top_n)
+  
+  # combine labels for top genes + out-of-bounds
+  labels <- bind_rows(
+    top_genes %>%
+      dplyr::mutate(lfc_capped = lfc, log_padj_capped = log_padj),
+    plotdat %>%
+      dplyr::filter(oob_x | oob_y) %>%
+      dplyr::mutate(lfc_capped = pmin(pmax(lfc, x_lim[1]), x_lim[2]),
+                    log_padj_capped = pmin(pmax(log_padj, y_lim[1]), y_lim[2]))
+  )
+  
+  # make the volcano plot
+  ggplot(plotdat, aes(x = lfc, y = log_padj, colour = change)) +
+    geom_point(data = dplyr::filter(plotdat, !(oob_x | oob_y)),
+               size = 2, alpha = 0.6, show.legend = FALSE) +
+    geom_point(data = dplyr::filter(plotdat, oob_x | oob_y),
+               aes(x = pmin(pmax(lfc, x_lim[1]), x_lim[2]),
+                   y = pmin(pmax(log_padj, y_lim[1]), y_lim[2])),
+               size = 2, shape = 6, show.legend = FALSE) +
+    geom_text_repel(data = labels,
+                    aes(x = lfc_capped, y = log_padj_capped, label = symbol),
+                    box.padding = 0.8, max.overlaps = Inf, size = 4, colour = "black") +
+    geom_hline(yintercept = -log10(0.01), linetype = "dashed", color = "black") +
+    coord_cartesian(xlim = x_lim, ylim = y_lim, expand = FALSE) +
+    labs(y = expression("−log"["10"] ~ "adjusted P value"),
+         x = expression("log"["2"] ~ "fold change (ashr)")) +
+  scale_colour_manual(values = c(up = upcolour, ns = nscolour, down = downcolour)) +
+  theme_bw() +
+  theme(axis.title.x = element_text(size = 12),
+        axis.title.y = element_text(size = 12),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12))
+}
+
+plotVolcano(degs, "mESC_t24_gg5", top_n = 2)
+plotVolcano(degs, "EpiLC_t24_gg5", upcolour = "#FDD163")
+plotVolcano(degs, "NE_t24_gg5", upcolour = "#FB7D80")
+
+#----------------------------------#
+# using the volcano plot function #
+#----------------------------------#
+
+ggsave(plot = plotVolcano(degs, "mESC_t24_gg5", top_n = 0), file = here("../Figures/Fig1J.png"), height = 4, width = 3.5, dpi = 300)
+ggsave(plot = plotVolcano(degs, "EpiLC_t24_gg5", upcolour = "#FDD163"), file = here("../Figures/Fig1K.png"), height = 4, width = 3.5,, dpi = 300)
+ggsave(plot = plotVolcano(degs, "NE_t24_gg5", upcolour = "#FB7D80"), file = here("../Figures/Fig1L.png"), height = 4, width = 3.5,, dpi = 300)
+
+```
+
+Fig S1L - venn diagram of DEGs up at 6 hours 
+
+```{r, messages=FALSE}
+
+library(here)
+library(tidyverse)
+library(ggplot2)
+library(eulerr)
+
+degs <- read.csv(file = here("../Data/RNAseq_ASCL1_DEGs.csv"))
+
+# venn diagram 6 hour
+
+euler_6h <- eulerr::euler(list(
+  "mESC 6h Dex" = degs %>% dplyr::filter(mESC_t6_gg5_change == "up") %>% pull(symbol),
+  "EpiLC 6h Dex" = degs %>% dplyr::filter(EpiLC_t6_gg5_change == "up") %>% pull(symbol),
+  "NE 6h Dex" = degs %>% dplyr::filter(NE_t6_gg5_change == "up") %>% pull(symbol)
+))
+
+colours_t6 <- c("#79C9D1", "#FFDC92", "#FF9792")
+
+t6 <- plot(euler_6h,
+           fill = colours_t6,
+           edges = list(col = "black"),
+           #labels = list(font = 1, cex = 1.2, col = "black", labels = custom_labels),
+           quantities = TRUE
+)
+
+t6 
+
+ggsave(here("../Figures/FigS1I.png"), t6, width = 4, height = 4, dpi = 300)
+
+```
+
+Fig S1M-O - volcano plots of DEGs after 6 hours 
+
+```{r, messages=FALSE}
+
+# note the log fold change is shrunk using ashr, represents the comparison against t0 gg5, but changes are filtered to be also significant in the vs c11 comparison 
+
+library(here)
+library(tidyverse)
+library(ggplot2)
+
+degs <- read.csv(file = here("../Data/RNAseq_ASCL1_DEGs.csv"))
+
+#----------------------------------#
+# define the volcano plot function #
+#----------------------------------#
+
+library(dplyr)
+library(ggplot2)
+library(ggrepel)
+
+plotVolcano <- function(degs, contrast_prefix,
+                        x_lim = c(-10, 10),
+                        y_lim = c(0, 80),
+                        upcolour = "#76C9D1",
+                        nscolour = "grey80",
+                        downcolour = "grey30",
+                        top_n = 10) {
+  
+  # build column names based on prefix
+  lfc_col <- paste0(contrast_prefix, "_ashrLFC")
+  padj_col <- paste0(contrast_prefix, "_padj")
+  change_col <- paste0(contrast_prefix, "_change")
+  
+  # prepare plot data
+  plotdat <- degs %>%
+    dplyr::mutate(
+      lfc = !!rlang::sym(lfc_col),
+      log_padj = -log10(!!rlang::sym(padj_col)),
+      change = factor(!!rlang::sym(change_col), levels = c("up", "ns", "down")),
+      oob_x = lfc < x_lim[1] | lfc > x_lim[2],
+      oob_y = log_padj < y_lim[1] | log_padj > y_lim[2]
+    ) %>%
+    dplyr::select(symbol, lfc, log_padj, change, oob_x, oob_y)
+  
+  # top N inside-bound genes
+  top_genes <- plotdat %>%
+    dplyr::filter(!(oob_x | oob_y)) %>%
+    dplyr::arrange(desc(abs(log_padj))) %>%
+    dplyr::slice_head(n = top_n)
+  
+  # combine labels for top genes + out-of-bounds
+  labels <- bind_rows(
+    top_genes %>%
+      dplyr::mutate(lfc_capped = lfc, log_padj_capped = log_padj),
+    plotdat %>%
+      dplyr::filter(oob_x | oob_y) %>%
+      dplyr::mutate(lfc_capped = pmin(pmax(lfc, x_lim[1]), x_lim[2]),
+                    log_padj_capped = pmin(pmax(log_padj, y_lim[1]), y_lim[2]))
+  )
+  
+  # make the volcano plot
+  ggplot(plotdat, aes(x = lfc, y = log_padj, colour = change)) +
+    geom_point(data = dplyr::filter(plotdat, !(oob_x | oob_y)),
+               size = 2, alpha = 0.6, show.legend = FALSE) +
+    geom_point(data = dplyr::filter(plotdat, oob_x | oob_y),
+               aes(x = pmin(pmax(lfc, x_lim[1]), x_lim[2]),
+                   y = pmin(pmax(log_padj, y_lim[1]), y_lim[2])),
+               size = 2, shape = 6, show.legend = FALSE) +
+    geom_text_repel(data = labels,
+                    aes(x = lfc_capped, y = log_padj_capped, label = symbol),
+                    box.padding = 0.8, max.overlaps = Inf, size = 4, colour = "black") +
+    geom_hline(yintercept = -log10(0.01), linetype = "dashed", color = "black") +
+    coord_cartesian(xlim = x_lim, ylim = y_lim, expand = FALSE) +
+    labs(y = expression("−log"["10"] ~ "adjusted P value"),
+         x = expression("log"["2"] ~ "fold change (ashr)")) +
+  scale_colour_manual(values = c(up = upcolour, ns = nscolour, down = downcolour)) +
+  theme_bw() +
+  theme(axis.title.x = element_text(size = 12),
+        axis.title.y = element_text(size = 12),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12))
+}
+
+p1 <- plotVolcano(degs, "mESC_t6_gg5", top_n = 10)
+p1
+
+p2 <- plotVolcano(degs, "EpiLC_t6_gg5", upcolour = "#FDD163")
+p2
+
+p3 <- plotVolcano(degs, "NE_t6_gg5", upcolour = "#FB7D80")
+p3
+
+ggsave(plot = p1, file = here("../Figures/FigS1J-1.png"), height = 4, width = 3.5, dpi = 300)
+ggsave(plot = p2, file = here("../Figures/FigS1K-1.png"), height = 4, width = 3.5,, dpi = 300)
+ggsave(plot = p3, file = here("../Figures/FigS1L-1.png"), height = 4, width = 3.5, dpi = 300)
+
+```
+
+Fig S1M-O - GO analysis of DEGs after 6 hours to match volcano plots 
+
+```{r, messages=FALSE}
+
+library(here)
+library(tidyverse)
+library(ggplot2)
+library(clusterProfiler)
+library(org.Mm.eg.db)
+library(cowplot)
+
+degs <- read.csv(file = here("../Data/RNAseq_ASCL1_DEGs.csv"))
+
+# plot top 5 enriched (& simplified) GO terms for upregulated genes at 24 hours in each cell type - not clustered, so some genes will be shared between conditions 
+
+mesc_up <- degs %>%
+  dplyr::filter(mESC_t6_gg5_change == "up") %>%
+  pull(symbol)
+
+go_mesc <- enrichGO(
+  gene          = mesc_up,
+  OrgDb         = org.Mm.eg.db,
+  keyType       = "SYMBOL",    
+  ont           = "BP",
+  pAdjustMethod = "BH",
+  pvalueCutoff  = 0.05,
+  qvalueCutoff  = 0.2)
+
+smp_mesc <- simplify(go_mesc)
+
+p_mesc <- barplot(smp_mesc, showCategory = 5) + theme_cowplot() + scale_y_discrete(labels = function(x) str_wrap(x, width = 15)) +
+  scale_fill_gradient(high = "#AAE4E9", low = "#79C9D1")
+
+p_mesc
+
+ggsave(plot = p_mesc, filename = here("../Figures/FigS1J-2.png"), width = 3.5, height = 4, dpi = 300, bg = "white")
+
+
+
+epilc_up <- degs %>%
+  dplyr::filter(EpiLC_t6_gg5_change == "up") %>%
+  pull(symbol)
+
+go_epilc <- enrichGO(
+  gene          = epilc_up,
+  OrgDb         = org.Mm.eg.db,
+  keyType       = "SYMBOL",    
+  ont           = "BP",
+  pAdjustMethod = "BH",
+  pvalueCutoff  = 0.05,
+  qvalueCutoff  = 0.2)
+
+smp_epilc <- simplify(go_epilc)
+
+p_epilc <- barplot(smp_epilc, showCategory = 5) + theme_cowplot() + scale_y_discrete(labels = function(x) str_wrap(x, width = 15)) +
+  scale_fill_gradient(high = "#FFE8B9", low = "#FFDC92")
+
+p_epilc
+
+ggsave(plot = p_epilc, filename = here("../Figures/FigS1K-2.png"), width = 3.5, height = 4, dpi = 300, bg = "white")
+
+
+
+ne_up <- degs %>%
+  dplyr::filter(NE_t6_gg5_change == "up") %>%
+  pull(symbol)
+
+go_ne <- enrichGO(
+  gene          = ne_up,
+  OrgDb         = org.Mm.eg.db,
+  keyType       = "SYMBOL",    
+  ont           = "BP",
+  pAdjustMethod = "BH",
+  pvalueCutoff  = 0.05,
+  qvalueCutoff  = 0.2)
+
+smp_ne <- simplify(go_ne)
+
+p_ne <- barplot(smp_ne, showCategory = 5) + theme_cowplot() + scale_y_discrete(labels = function(x) str_wrap(x, width = 15)) +
+  scale_fill_gradient(high = "#FFBCB9", low = "#FF9792")
+
+p_ne
+
+ggsave(plot = p_ne, filename = here("../Figures/FigS1L-2.png"), width = 3.5, height = 4, dpi = 300, bg = "white")
+
+```
+
+
+# FIG 2 
+
+Fig 2A - deeptools heatmap for ASCL1 ChIP-seq split by cell type 
+
+```{bash}
+
+computeMatrix scale-regions -S \
+bigwigs/gG5_mESC_HA_RLE_merged.bigwig \
+bigwigs/gG5_EpiLC_HA_RLE_merged.bigwig \
+bigwigs/gG5_NE_HA_RLE_merged.bigwig \
+-R beds/ChIPseq_ASCL1_mesconly10k.bed \
+beds/ChIPseq_ASCL1_mescepilc10k.bed \
+beds/ChIPseq_ASCL1_epilconly10k.bed \
+beds/ChIPseq_ASCL1_epilcne10k.bed \
+beds/ChIPseq_ASCL1_neonly10k.bed \
+beds/ChIPseq_ASCL1_mescne10k.bed \
+beds/ChIPseq_ASCL1_universal10k.bed \
+--beforeRegionStartLength 1000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 1000 \
+--missingDataAsZero -o matrix/matrix_ascl1chip.mat.gz
+ 
+plotHeatmap -m matrix/matrix_ascl1chip.mat.gz -out plots/ascl1_chip.png --whatToShow 'heatmap and colorbar' --samplesLabel "ASCL1" "ASCL1" "ASCL1" --startLabel "" --endLabel "" --colorMap Greys Greys Greys --zMin 0 0 0 --zMax 100 100 100 --sortRegions descend
+
+```
+
+Fig 2B-C - specific gene counts for Myt1 and Hdac11
+
+```{r}
+library(here)
+library(AnnotationHub)
+library(tidyverse)
+library(ggplot2)
+library(DESeq2)
+library(cowplot)
+
+# load in the rna-seq rds object
+# these counts are corrected for library size and Tx length
+rna <- readRDS(file = here("../Data/RNAseq_ASCL1_dds.Rds"))
+rna <- estimateSizeFactors(rna)
+rnaseq_counts <- counts(object = rna, normalized = TRUE)
+# 
+# # write to a csv 
+# write.csv(rnaseq_counts, file = here("../results/countsmatrix_normalised.csv"))
+
+# need to annotate the row names to gene symbols
+ah <- AnnotationHub()
+# ah object ID for the mm39 108 ensembl build is AH109367
+EnsDb.Mmusculus.v108 <- ah[["AH109367"]]
+genes <- genes(EnsDb.Mmusculus.v108, return.type = "DataFrame")
+gene2symbol <- genes[c(1,12)]
+gene2symbol_matched <- gene2symbol$symbol[match(rownames(rnaseq_counts), gene2symbol$gene_id)]
+# annotate the rna-seq table
+rownames(rnaseq_counts) <- gene2symbol_matched
+
+colours <- c("C11_mESC_t24" = "lightgrey", "C11_EpiLC_t24" = "lightgrey", "C11_NE_t24" = "lightgrey",
+             "gG5_mESC_t0" = "#AAE4E9","gG5_mESC_t6" = "#79C9D1","gG5_mESC_t24" = "#4FAAB2",
+             "gG5_EpiLC_t0" = "#FFE8B9","gG5_EpiLC_t6" = "#FFDC92","gG5_EpiLC_t24" = "#FFD170",
+             "gG5_NE_t0" = "#FFBCB9","gG5_NE_t6" = "#FF9792","gG5_NE_t24" = "#FF7770")
+
+# before generating the heatmap, want to change the order so that the C11 columns are next to the t0 columns 
+desired_order <- c(
+  # mESC
+  "exp1_C11_mESC_t24_rep1", "exp1_C11_mESC_t24_rep2", "exp1_C11_mESC_t24_rep3",
+  "exp2_gG5_mESC_t0_rep1", "exp2_gG5_mESC_t0_rep2", "exp2_gG5_mESC_t0_rep3", "exp2_gG5_mESC_t0_rep4",
+  "exp2_gG5_mESC_t6_rep1", "exp2_gG5_mESC_t6_rep2", "exp2_gG5_mESC_t6_rep3", "exp2_gG5_mESC_t6_rep4",
+  "exp1_gG5_mESC_t24_rep1", "exp1_gG5_mESC_t24_rep2", "exp1_gG5_mESC_t24_rep3", 
+  "exp2_gG5_mESC_t24_rep1", "exp2_gG5_mESC_t24_rep2", "exp2_gG5_mESC_t24_rep3", "exp2_gG5_mESC_t24_rep4",
+  
+  # EpiLC
+  "exp1_C11_EpiLC_t24_rep1", "exp1_C11_EpiLC_t24_rep2", "exp1_C11_EpiLC_t24_rep3",
+  "exp2_gG5_EpiLC_t0_rep1", "exp2_gG5_EpiLC_t0_rep2", "exp2_gG5_EpiLC_t0_rep3", "exp2_gG5_EpiLC_t0_rep4",
+  "exp2_gG5_EpiLC_t6_rep1", "exp2_gG5_EpiLC_t6_rep2", "exp2_gG5_EpiLC_t6_rep3", "exp2_gG5_EpiLC_t6_rep4",
+  "exp1_gG5_EpiLC_t24_rep1", "exp1_gG5_EpiLC_t24_rep2", "exp1_gG5_EpiLC_t24_rep3", 
+  "exp2_gG5_EpiLC_t24_rep1", "exp2_gG5_EpiLC_t24_rep2", "exp2_gG5_EpiLC_t24_rep3",
+  
+  # NE
+  "exp1_C11_NE_t24_rep1", "exp1_C11_NE_t24_rep2", "exp1_C11_NE_t24_rep3", 
+  "exp2_gG5_NE_t0_rep1", "exp2_gG5_NE_t0_rep2", "exp2_gG5_NE_t0_rep3", "exp2_gG5_NE_t0_rep4",
+  "exp2_gG5_NE_t6_rep1", "exp2_gG5_NE_t6_rep2", "exp2_gG5_NE_t6_rep3", "exp2_gG5_NE_t6_rep4",
+  "exp1_gG5_NE_t24_rep1", "exp1_gG5_NE_t24_rep2", "exp1_gG5_NE_t24_rep3", 
+  "exp2_gG5_NE_t24_rep1", "exp2_gG5_NE_t24_rep2", "exp2_gG5_NE_t24_rep3", "exp2_gG5_NE_t24_rep4"
+)
+
+
+# Reorder the heatmap data and annotation
+rnaseq_counts <- rnaseq_counts[, desired_order]
+
+genes.ofi <- c("Hdac11", "Myt1")
+
+# Loop through each gene and create + save the plot
+for (gene.ofi in genes.ofi) {
+  
+  # Get counts for current gene
+  log.counts.ofi <- log2(rnaseq_counts[gene.ofi, ] + 1)
+  counts.ofi <- rnaseq_counts[gene.ofi, ]
+  
+  # Create plot
+  gg.logtpmBox <- counts.ofi %>%
+    tibble::as_tibble() %>%
+    mutate(sample = names(counts.ofi)) %>%
+    separate(sample, c('exp', 'line', 'cell', 'time', 'rep'), sep = '_') %>%
+    mutate(cond_time = paste(line, cell, time, sep = "_")) %>%
+    mutate(cond_time = factor(cond_time, levels = unique(cond_time))) %>%
+    ggplot(aes(x = cond_time, y = value, fill = cond_time)) +
+    geom_boxplot(width = 0.7, outlier.shape = NA, color = "black", size = 0.3) +
+    geom_point(
+      aes(fill = cond_time),
+      position = position_jitter(width = 0.1, height = 0),
+      size = 2, shape = 21, color = "black"
+    ) +
+    xlab('') +
+    #ylab(bquote(log[2]~"(scaled counts + 1)")) +
+    ylab("scaled counts") +
+    scale_fill_manual(values = colours) +
+    scale_color_manual(values = colours) +
+    scale_y_continuous(limits = c(NA, NA)) +
+    theme_cowplot() +
+    labs(title = gene.ofi) +
+    theme(
+      legend.position = 'none',
+      axis.line.x = element_line(linewidth = 0.4),
+      axis.line.y = element_line(linewidth = 0.4),
+      axis.line = element_line(linetype = 'solid'),
+      axis.text.x = element_blank(),
+      axis.title.y = element_blank(),
+      plot.title = element_text(size = 16, face = "italic", hjust = 0.5)
+    )
+  
+  # Save the plot
+  ggsave(
+    plot = gg.logtpmBox,
+    filename = here("../Figures/", paste0("RNAseq_", gene.ofi, ".png")),
+    device = "png", units = "cm", width = 5.5, height = 8, bg = "white"
+  )
+}
+```
+
+Fig 2D - categorising peaks based on cell type binding & proximal DEGs
+
+```{r, messages=FALSE}
+
+library(here)
+library(tidyverse)
+library(GenomicRanges)
+
+# which cell types are the peaks bound in 
+
+degs <- read.table(file = here("../Data/RNAseq_ASCL1_DEGs.csv"), sep = ",", header = TRUE)
+
+degs.neonly <- degs %>% dplyr::filter(t24up_group == "ne_only") # 235 genes in this list 
+
+peaktogenes <- read.table(file = here("../Data/ChIPseq_allpeaktogenes.txt"), sep = "\t", header = TRUE,row.names = 1)
+
+peaktogenes.neonly <- peaktogenes %>% 
+  dplyr::filter(gene_symbol %in% dplyr::pull(degs.neonly, var = symbol)) %>%
+  dplyr::filter(peakset %in% c("NE", "EpiLC_NE", "mESC_NE", "Universal"))
+
+boundgenes <- peaktogenes.neonly %>% pull(gene_symbol) %>% unique() # 208 genes 
+
+write.table(boundgenes, file = here("../Data/ChIPseq_NEboundgenes_208.txt"), quote = FALSE)
+
+# find just the peaks 
+
+peaks <- peaktogenes.neonly %>%
+  dplyr::select(-gene_id, -gene_symbol) %>% 
+  unique() %>% 
+  GRanges() %>% 
+  as.data.frame()
+
+# this gives the 653 sites that we are interested in 
+
+# write this to a BED file for further plotting 
+
+write.table(peaks, file = here("../Data/ChIPseq_653NEsites.bed"), sep = "\t", row.names = FALSE, quote = FALSE, col.names = FALSE)
+
+# 198 are NE only 
+write.table(peaks %>% dplyr::filter(peakset == "NE"), 
+            file = here("../Data/ChIPseq_653NEsites_splitNEonly.bed"), sep = "\t", row.names = FALSE, quote = FALSE, col.names = FALSE)
+
+# 455 are not NE only 
+write.table(peaks %>% dplyr::filter(peakset != "NE"), 
+            file = here("../Data/ChIPseq_653NEsites_splitnotNEonly.bed"), sep = "\t", row.names = FALSE, quote = FALSE, col.names = FALSE)
+
+# 417 are not in mESC
+write.table(peaks %>% dplyr::filter(!peakset %in% c("Universal", "mESC_NE")), 
+            file = here("../Data/ChIPseq_653NEsites_splitnotmesc.bed"), sep = "\t", row.names = FALSE, quote = FALSE, col.names = FALSE)
+
+# 236 are in mESC
+write.table(peaks %>% dplyr::filter(peakset %in% c("Universal", "mESC_NE")), 
+            file = here("../Data/ChIPseq_653NEsites_splitmesc.bed"), sep = "\t", row.names = FALSE, quote = FALSE, col.names = FALSE)
+
+```
+
+Fig 2E - boxplots to show ChIP-seq signal strength at sites linked to NE-specific DEGs 
+
+```{r, messages=FALSE}
+
+library(rtracklayer)
+library(GenomicRanges)
+library(here)
+library(tidyverse)
+library(rstatix)
+library(ggpubr)
+
+
+ascl1peaks <- read.table(
+  file = here("../Data/ChIPseq_NEspecificDEG_peaks_full.csv"),
+  sep = ",",
+  header = TRUE
+)
+
+neonly <- ascl1peaks %>%
+  dplyr::filter(in_mESC_10k == FALSE & in_EpiLC_10k == FALSE) %>%
+  dplyr::select(2:4) %>%
+  GRanges() %>%
+  unique()
+
+notneonly <- ascl1peaks %>%
+  dplyr::filter(in_mESC_10k == TRUE | in_EpiLC_10k == TRUE) %>%
+  dplyr::select(2:4) %>%
+  GRanges() %>%
+  unique()
+
+# nemesc <- ascl1peaks %>%
+#   dplyr::filter(in_mESC_10k == TRUE) %>%
+#   dplyr::select(2:4) %>%
+#   GRanges() %>%
+#   unique()
+# 
+# neepilc <- ascl1peaks %>%
+#   dplyr::filter(in_EpiLC_10k == TRUE) %>%
+#   dplyr::select(2:4) %>%
+#   GRanges() %>%
+#   unique()
+
+
+plot_ascl1_signal <- function(
+  regions_gr,
+  label,
+  outdir = here("../Figures")
+) {
+
+  bw_dir <- here("../Data/chipseq_ascl1-ha/bigwig/")
+
+  bw_files <- normalizePath(
+    list.files(
+      bw_dir,
+      pattern = "_merged\\.(bw|bigwig)$",
+      full.names = TRUE
+    ),
+    winslash = "/",
+    mustWork = TRUE
+  )
+
+  stopifnot(length(bw_files) == 3)
+
+  extract_bw_sum <- function(bw_file, regions) {
+    bw <- BigWigFile(bw_file)
+    signal <- import(bw, which = regions)
+
+    hits <- findOverlaps(signal, regions)
+    if (length(hits) == 0) return(rep(0, length(regions)))
+
+    ov <- pintersect(signal[queryHits(hits)], regions[subjectHits(hits)])
+    weighted_signal <- signal$score[queryHits(hits)] * width(ov)
+    region_sum <- tapply(weighted_signal, subjectHits(hits), sum)
+
+    out <- numeric(length(regions))
+    out[as.integer(names(region_sum))] <- region_sum
+    out
+  }
+
+  signal_matrix <- sapply(bw_files, extract_bw_sum, regions = regions_gr)
+  colnames(signal_matrix) <- sub("\\.bigwig$|\\.bw$", "", basename(bw_files))
+
+  df_long <- as.data.frame(signal_matrix) %>%
+    mutate(feature_id = row_number()) %>%
+    pivot_longer(
+      -feature_id,
+      names_to = "sample",
+      values_to = "signal"
+    ) %>%
+    mutate(
+      log_signal = log2(signal + 1),
+      condition = case_when(
+        grepl("_mESC_", sample) ~ "mESC",
+        grepl("_EpiLC_", sample) ~ "EpiLC",
+        grepl("_NE_", sample) ~ "NE"
+      )
+    ) %>%
+    filter(!is.na(condition)) %>%
+    mutate(condition = factor(condition, levels = c("mESC", "EpiLC", "NE")))
+
+  stats <- df_long %>%
+    pairwise_t_test(
+      log_signal ~ condition,
+      paired = TRUE,
+      p.adjust.method = "BH"
+    ) %>%
+    add_y_position(fun = "max")
+
+  p <- ggboxplot(
+    df_long,
+    x = "condition",
+    y = "log_signal",
+    fill = "condition",
+    color = "black",                         # box outlines
+    palette = c("#79C9D1", "#FFDC92", "#FF9792"),
+    add = "jitter",
+    add.params = list(
+      size = 0.6,
+      alpha = 0.3,
+      color = "condition"                   # point colours
+    )
+  ) +
+    scale_color_manual(values = c(
+      mESC  = "#4FAAB2",
+      EpiLC = "#FFD170",
+      NE    = "#FF7770"
+    )) +
+    stat_pvalue_manual(
+      stats,
+      label = "p.adj.signif",
+      tip.length = 0.01,
+      step.increase = 0.1
+    ) +
+    labs(
+      title = paste0("ASCL1 - ", label),
+      y = expression(log[2](signal + 1)),
+      x = ""
+    ) +
+    theme_classic() +
+    theme(
+      plot.title = element_text(size = 10),
+      axis.text.x = element_text(size = 8),
+      axis.text.y = element_text(size = 10),
+      legend.position = "none"
+    ) +
+    scale_y_continuous(
+      breaks = c(10, 15, 20),
+      limits = c(10, 21.5)
+    )
+
+  ggsave(
+    p,
+    filename = file.path(outdir, paste0("Fig2G", label, ".png")),
+    bg = "white",
+    dpi = 300,
+    width = 2,
+    height = 3
+  )
+
+  list(plot = p, stats = stats)
+}
+
+res_neonly    <- plot_ascl1_signal(neonly, "NEonly")
+res_neonly$plot
+
+res_notneonly <- plot_ascl1_signal(notneonly, "NotNEonly")
+res_notneonly$plot
+```
+
+
+# FIG S2
+
+Fig S2B - correlation matrix of peaksets across replicates / conditions 
+
+```{r, messages=FALSE}
+
+library(here)
+library(DiffBind)
+library(tidyverse)
+library(ggplot2)
+library(AnnotationHub)
+
+diffbind_samples <- read.csv(here("../Data/ChIPseq_ASCL1_samples.csv"))
+
+chip_dba <- dba(sampleSheet = diffbind_samples, minOverlap = 1) # this includes all peaks
+
+# built-in blacklist function only uses ENCODE, mm39 not yet available so import custom 
+# import from https://github.com/dozmorovlab/excluderanges 
+ah <- AnnotationHub()
+# mm39 ID is AH107321
+chip_blacklist_mm39 <- ah[["AH107321"]]
+rm(ah)
+
+# filtering the peakset with the blacklist data 
+chip_dba <- dba.blacklist(chip_dba, blacklist = chip_blacklist_mm39, greylist = FALSE)
+# Removed: 6677 of 140238 intervals.
+# Removed: 2476 merged (of 57267) and 30318 (of 57267) consensus.
+
+chip_consensus_perCond <- dba.peakset(chip_dba, consensus = c(DBA_TISSUE,DBA_CONDITION), minOverlap = 2)
+chip_consensus_full <- dba(chip_consensus_perCond, mask = chip_consensus_perCond$masks$Consensus, minOverlap = 1)
+chip_consensus_peakset <- dba.peakset(chip_consensus_full, bRetrieve = TRUE, DataType = DBA_DATA_FRAME)
+
+dba.plotHeatmap(chip_consensus_perCond, 
+                ColAttributes = DBA_CONDITION,
+                colSideCols = c("#79C9D1", "#FDD163", "#FB7D80"),
+                colScheme = "Greys")
+
+png(filename = here("../Figures/FigS2B.png"), width = 7, height = 7, units = "in", res = 300)
+dba.plotHeatmap(chip_consensus_perCond, 
+                ColAttributes = DBA_CONDITION,
+                colSideCols = c("#79C9D1", "#FDD163", "#FB7D80"),
+                colScheme = "Greys")
+dev.off()
+
+```
+
+Fig S2C - PCA plot for ChIP-seq samples with normalisation 
+
+```{r, messages=FALSE}
+# pca plots for normalised chip-seq counts 
+
+library(DiffBind)
+library(here)
+
+# Load the DBA object
+dba <- readRDS(file = here("../Data/ChIPseq_ASCL1_normalised.Rds"))
+
+# Plot PCA 
+colours_3 <- c(mESC = "#79C9D1", EpiLC = "#FDD163", NE ="#FB7D80")
+
+dba.plotPCA(dba,
+            attributes = DBA_CONDITION,
+            score = DBA_SCORE_READS, # DBA_SCORE_READS for library size normalisation, DBA_SCORE_NORMALISED for reads in peaks with RLE
+            vColors = unlist(colours_3))
+
+dba.plotPCA(dba,
+            attributes = DBA_CONDITION,
+            score = DBA_SCORE_NORMALIZED,
+            vColors = unlist(colours_3))
+
+
+png(file = here("../Figures/FigS2C.png"),res = 300, units = "in", width = 5, height = 4)
+dba.plotPCA(dba,
+            attributes = DBA_CONDITION,
+            score = DBA_SCORE_NORMALIZED,
+            vColors = unlist(colours_3))
+dev.off()
+
+```
+
+Fig S2D - deeptools heatmap across replicates per condition 
+
+```{bash}
+
+computeMatrix scale-regions -S \
+../Data/chipseq_ascl1-ha/bigwig/gG5_mESC_HA_1_CPM.bw \
+../Data/chipseq_ascl1-ha/bigwig/gG5_mESC_HA_2_CPM.bw \
+../Data/chipseq_ascl1-ha/bigwig/gG5_mESC_HA_3_CPM.bw \
+../Data/chipseq_ascl1-ha/bigwig/gG5_mESC_HA_4_CPM.bw \
+../Data/chipseq_ascl1-ha/bigwig/gG5_mESC_HA_RLE_merged.bigwig \
+-R ../Data/ChIPseq_ASCL1_mesc10k.bed \
+--beforeRegionStartLength 1000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 1000 \
+--missingDataAsZero -o ../Data/deeptools/matrix/matrix_ascl1chip_mescreps.mat.gz
+
+plotHeatmap -m ../Data/deeptools/matrix/matrix_ascl1chip_mescreps.mat.gz -out ../Data/deeptools/plots/ascl1_mescreps.png --whatToShow 'heatmap and colorbar' --samplesLabel "Rep1" "Rep2" "Rep3" "Rep4" "Avg" --startLabel "" --endLabel "" --colorMap Greys Greys Greys Greys Greys --zMin 0 0 0 0 0 --zMax 100 100 100 100 100 --sortRegions descend
+
+```
+
+Fig S2E - annotation of peaks in mESC, EpiLC and NE to show enhancer / promoter binding sites
+
+```{r, messages=FALSE}
+
+library(here)
+library(tidyverse)
+# library(ChIPpeakAnno)
+library(ChIPseeker)
+library(TxDb.Mmusculus.UCSC.mm39.knownGene)
+
+# Using the consensus peaks defined and exported from Fig 14 
+mesc <- read_table(file = here("../Data/ChIPseq_ASCL1_mesc10k.bed"), col_names = FALSE, show_col_types = F) %>% 
+  setNames(c("chr", "start", "end", "peakID")) %>% GRanges()
+epilc <- read_table(file = here("../Data/ChIPseq_ASCL1_epilc10k.bed"), col_names = FALSE, show_col_types = F) %>%
+  setNames(c("chr", "start", "end", "peakID")) %>% GRanges()
+ne <- read_table(file = here("../Data/ChIPseq_ASCL1_ne10k.bed"), col_names = FALSE, show_col_types = F) %>%
+  setNames(c("chr", "start", "end", "peakID")) %>% GRanges()
+
+peaks <- list(mESC = mesc, EpiLC = epilc, NE = ne)
+
+annoList <- lapply(peaks, annotatePeak, tssRegion = c(-1000, 1000), TxDb = TxDb.Mmusculus.UCSC.mm39.knownGene, annoDb = "org.Mm.eg.db", addFlankGeneInfo = TRUE, flankDistance = 50000)
+
+annot_colours <- c("Promoter" = "#633372", "5' UTR" = "#9f5691", "3' UTR" = "#aa7aa1", "1st Exon" = "#9b3441", "Other Exon" = "#de597c", "1st Intron" = "#fe9b00", "Other Intron" = "#fbe183", "Downstream (<=300)" = "#f4c40f", "Distal Intergenic" = "#1f6e9c")
+
+p <- plotAnnoBar(annoList, title = "Annotated features of top 10,000 peaks \nper cell type") + scale_fill_manual(values = annot_colours) + theme(title = element_blank())
+
+p
+
+png(file = here("../Figures/FigS2E.png"), res = 300, units = "cm", height = 6, width = 12)
+p
+dev.off()
+
+```
+
+Fig S2H - correlation heatmap for published ASCL1 ChIP-seq binding sites
+
+```{r, messages=FALSE}
+
+# distance matrix for published chip-seq sets
+
+library(here)
+library(tidyverse)
+library(DiffBind)
+library(pheatmap)
+library(MetBrewer)
+
+##### read in our chip data 
+
+mesc <- read_delim((file = here("../Data/ChIPseq_ASCL1_mesc10k.bed")), col_names = FALSE, show_col_types = FALSE) %>%
+  dplyr::rename(seqnames = X1, start = X2, end = X3) %>%
+  makeGRangesFromDataFrame(keep.extra.columns = FALSE)
+
+epilc <- read_delim((file = here("../Data/ChIPseq_ASCL1_epilc10k.bed")), col_names = FALSE, show_col_types = FALSE) %>%
+  dplyr::rename(seqnames = X1, start = X2, end = X3) %>%
+  makeGRangesFromDataFrame(keep.extra.columns = FALSE)
+
+ne <- read_delim((file = here("../Data/ChIPseq_ASCL1_ne10k.bed")), col_names = FALSE, show_col_types = FALSE) %>%
+  dplyr::rename(seqnames = X1, start = X2, end = X3) %>%
+  makeGRangesFromDataFrame(keep.extra.columns = FALSE)
+
+
+##### read in the published data 
+
+borromeo2014 <- read_delim(file = here("../Data/chipseq_published/borromeo2014/borromeo2014_mm39.bed"), col_names = FALSE, show_col_types = FALSE) %>%
+  dplyr::rename(seqnames = X1, start = X2, end = X3) %>%
+  makeGRangesFromDataFrame(keep.extra.columns = FALSE)
+
+webb2013 <- read_delim(file = here("../Data/chipseq_published/webb2013/webb2013_adultNPC_mm39.bed"), col_names = FALSE, show_col_types = FALSE) %>%
+  dplyr::rename(seqnames = X1, start = X2, end = X3) %>%
+  makeGRangesFromDataFrame(keep.extra.columns = FALSE)
+
+raposo2015_early <- read_delim(file = here("../Data/chipseq_published/raposo2015/raposo2015_early_mm39.bed"), col_names = FALSE, show_col_types = FALSE) %>%
+  dplyr::rename(seqnames = X1, start = X2, end = X3) %>%
+  makeGRangesFromDataFrame(keep.extra.columns = FALSE)
+
+raposo2015_late <- read_delim(file = here("../Data/chipseq_published/raposo2015/raposo2015_late_mm39.bed"), col_names = FALSE, show_col_types = FALSE) %>%
+  dplyr::rename(seqnames = X1, start = X2, end = X3) %>%
+  makeGRangesFromDataFrame(keep.extra.columns = FALSE)
+
+casey2018 <- read_delim(file = here("../Data/chipseq_published/casey2018/casey2018_mesc_mm39.bed"), col_names = FALSE, show_col_types = FALSE) %>%
+  dplyr::rename(seqnames = X1, start = X2, end = X3) %>%
+  makeGRangesFromDataFrame(keep.extra.columns = FALSE)
+
+wapinski2013_mef <- read_delim(file = here("../Data/chipseq_published/wapinski2013/mm39_wapinski2013_MEF.bed"), col_names = FALSE, show_col_types = FALSE) %>%
+  dplyr::rename(seqnames = X1, start = X2, end = X3) %>%
+  makeGRangesFromDataFrame(keep.extra.columns = FALSE)
+
+wapinski2013_npc<- read_delim(file = here("../Data/chipseq_published/wapinski2013/mm39_wapinski2013_NPC.bed"), col_names = FALSE, show_col_types = FALSE) %>%
+  dplyr::rename(seqnames = X1, start = X2, end = X3) %>%
+  makeGRangesFromDataFrame(keep.extra.columns = FALSE)
+
+wang2023<- read_delim(file = here("../Data/chipseq_published/wang2023/wang2023_mef_mm39.bed"), col_names = FALSE, show_col_types = FALSE) %>%
+  dplyr::rename(seqnames = X1, start = X2, end = X3) %>%
+  makeGRangesFromDataFrame(keep.extra.columns = FALSE)
+
+
+# make a list of the peak sets 
+
+peak_sets <- list(
+  mESC = mesc,
+  EpiLC = epilc,
+  NE = ne,
+  NeuralTubeE12.5 = borromeo2014,
+  AdultNPCs = webb2013,
+  NSCs_30min = raposo2015_early,
+  NSCs_18hr = raposo2015_late,
+  mESCSerumLIF = casey2018,
+  MEF_1 = wapinski2013_mef,
+  NSCs = wapinski2013_npc,
+  MEF_2 = wang2023
+)
+
+all_peaks <- Reduce(c, peak_sets)
+consensus_peaks <- reduce(all_peaks)  # Merge overlapping regions, there are 109,788 peaks in this set, most seem to come from the wang set 
+
+presence_matrix <- sapply(peak_sets, function(peaks) {
+  overlapsAny(consensus_peaks, peaks)
+})
+
+# Convert to numeric (TRUE/FALSE → 1/0)
+presence_matrix <- apply(presence_matrix, 2, as.integer) # creates a matrix that converts TRUE/FALSE into binary 
+rownames(presence_matrix) <- paste0("region_", seq_along(consensus_peaks))
+
+# Distance matrix using Jaccard distance or Euclidean
+distance_matrix <- dist(t(presence_matrix), method = "binary")  # Jaccard-style
+
+# OR: Correlation matrix (e.g., Pearson)
+cor_matrix <- cor(presence_matrix, method = "pearson")
+
+p <- pheatmap(cor_matrix,
+         main = "Correlation Heatmap of Peak Sets",
+         clustering_distance_rows = 'euclidean',
+         clustering_distance_cols = "euclidean",show_colnames = FALSE,treeheight_row = 0,
+         color = met.brewer(name = "VanGogh3", direction = 1)
+)
+
+png(filename = here("../Figures/FigS2G.png"), height = 5, width = 6, units = "in", res = 300)
+p
+dev.off()
+
+```
+
+Fig S2I - plot profiles of ASCL1 binding strength at mESC, NSC, and neural tube binding sites
+
+```{bash}
+
+MATRIX_OUT="../Data/deeptools/matrix/matrix_ascl1chip_caseymESCsites.mat.gz"
+
+computeMatrix scale-regions -S \
+  ../Data/chipseq_ascl1-ha/bigwig/gG5_mESC_HA_RLE_merged.bigwig \
+  ../Data/chipseq_ascl1-ha/bigwig/gG5_EpiLC_HA_RLE_merged.bigwig \
+  ../Data/chipseq_ascl1-ha/bigwig/gG5_NE_HA_RLE_merged.bigwig \
+  -R ../Data/chipseq_published/casey2018/casey2018_mesc_mm39.bed \
+  --beforeRegionStartLength 1000 \
+  --regionBodyLength 500 \
+  --afterRegionStartLength 1000 \
+  --missingDataAsZero \
+  -o $MATRIX_OUT
+
+plotProfile \
+  -m $MATRIX_OUT \
+  -out ../Data/deeptools/plots/ESCsites_profile.png \
+  --perGroup \
+  --samplesLabel mESC EpiLC NE \
+  --colors "#79C9D1" "#FFDC92" "#FF9792"
+ 
+computeMatrix scale-regions -S \
+bigwigs/gG5_mESC_HA_RLE_merged.bigwig \
+bigwigs/gG5_EpiLC_HA_RLE_merged.bigwig \
+bigwigs/gG5_NE_HA_RLE_merged.bigwig \
+-R beds/mm39_wapinski2013_NPC_501bp.bed \
+--beforeRegionStartLength 1000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 1000 \
+--missingDataAsZero -o matrix/matrix_ascl1chip_wapinskiNPCsites.mat.gz -p 70
+ 
+plotProfile -m matrix/matrix_ascl1chip_wapinskiNPCsites.mat.gz -out plots/NSCsites_profile.png --perGroup --samplesLabel mESC EpiLC NE --colors "#79C9D1" "#FFDC92" "#FF9792"
+ 
+computeMatrix scale-regions -S \
+bigwigs/gG5_mESC_HA_RLE_merged.bigwig \
+bigwigs/gG5_EpiLC_HA_RLE_merged.bigwig \
+bigwigs/gG5_NE_HA_RLE_merged.bigwig \
+-R beds/borromeo2014_mm39.bed \
+--beforeRegionStartLength 1000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 1000 \
+--missingDataAsZero -o matrix/matrix_ascl1chip_borromeoNTsites.mat.gz -p 70
+ 
+plotProfile -m matrix/matrix_ascl1chip_borromeoNTsites.mat.gz -out plots/NTsites_profile.png --perGroup --samplesLabel mESC EpiLC NE --colors "#79C9D1" "#FFDC92" "#FF9792"
+
+```
+
+
+# FIG 3
+
+Fig 3B - PCA plot of ATAC-seq samples 
+
+```{r, messages=FALSE}
+
+library(here)
+library(tidyverse)
+library(DiffBind)
+
+atac <- readRDS(file = here("../Data/ATACseq_analysed_RLE.Rds"))
+
+
+colours_9 <- list("mESC_0h" = "#AAE4E9","mESC_6h" = "#79C9D1","mESC_24h" = "#4FAAB2",
+                  "EpiLC_0h" = "#FFE8B9","EpiLC_6h" = "#FFDC92","EpiLC_24h" = "#FFD170",
+                  "NE_0h" = "#FFBCB9","NE_6h" = "#FF9792","NE_24h" = "#FF7770")
+
+pca1 <- dba.plotPCA(atac, attributes = DBA_TREATMENT, vColors = unlist(colours_9))
+
+png(file = here("../Figures/Fig3B.png"), width = 6, height = 5, units = "in", res = 300)
+pca1
+dev.off()
+
+```
+
+Fig 3C - deeptools heatmap of ascl1 chip sites split by open or closed in mesc, epilc and ne 
+
+```{bash}
+
+computeMatrix scale-regions -S \
+bigwigs/gG5_mESC_HA_RLE_merged.bigwig \
+bigwigs/gG5_mESC_0h_ATAC_TMMmerged.bigwig \
+-R beds/chip_mescOPEN_t0.bed \
+beds/chip_mescCLOSED_t0.bed \
+--beforeRegionStartLength 1000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 1000 \
+--missingDataAsZero -o matrix/matrix_chipatac0_mesc.mat.gz -p 70
+ 
+plotHeatmap -m matrix/matrix_chipatac0_mesc.mat.gz -out plots/chipatac_mesc.png \
+--whatToShow 'heatmap and colorbar' --samplesLabel "ASCL1" "ATAC 0h" --startLabel "" --endLabel "" \
+--colorMap Greys Greens --zMin 0 0 --zMax 100 25 --sortRegions descend
+
+
+computeMatrix scale-regions -S \
+bigwigs/gG5_EpiLC_HA_RLE_merged.bigwig \
+bigwigs/gG5_EpiLC_0h_ATAC_TMMmerged.bigwig \
+-R beds/chip_epilcOPEN_t0.bed \
+beds/chip_epilcCLOSED_t0.bed \
+--beforeRegionStartLength 1000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 1000 \
+--missingDataAsZero -o matrix/matrix_chipatac0_epilc.mat.gz -p 70
+ 
+plotHeatmap -m matrix/matrix_chipatac0_epilc.mat.gz -out plots/chipatac_epilc.png \
+--whatToShow 'heatmap and colorbar' --samplesLabel "ASCL1" "ATAC 0h" --startLabel "" --endLabel "" \
+--colorMap Greys Greens --zMin 0 0 --zMax 100 25 --sortRegions descend
+
+ 
+computeMatrix scale-regions -S \
+bigwigs/gG5_NE_HA_RLE_merged.bigwig \
+bigwigs/gG5_NE_0h_ATAC_TMMmerged.bigwig \
+-R beds/chip_neOPEN_t0.bed \
+beds/chip_neCLOSED_t0.bed \
+--beforeRegionStartLength 1000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 1000 \
+--missingDataAsZero -o matrix/matrix_chipatac0_ne.mat.gz -p 70
+ 
+plotHeatmap -m matrix/matrix_chipatac0_ne.mat.gz -out plots/chipatac_ne.png \
+--whatToShow 'heatmap and colorbar' --samplesLabel "ASCL1" "ATAC 0h" --startLabel "" --endLabel "" \
+--colorMap Greys Greens --zMin 0 0 --zMax 100 25 --sortRegions descend
+
+
+## global overview of atac and chip 
+
+computeMatrix scale-regions -S \
+chipseq_ascl1-ha/bigwig/gG5_mESC_HA_RLE_merged.bigwig \
+chipseq_ascl1-ha/bigwig/gG5_EpiLC_HA_RLE_merged.bigwig \
+chipseq_ascl1-ha/bigwig/gG5_NE_HA_RLE_merged.bigwig \
+atacseq/bigwig/gG5_mESC_0h_ATAC_TMMmerged.bigwig \
+atacseq/bigwig/gG5_mESC_24h_ATAC_TMMmerged.bigwig \
+atacseq/bigwig/gG5_EpiLC_0h_ATAC_TMMmerged.bigwig \
+atacseq/bigwig/gG5_EpiLC_24h_ATAC_TMMmerged.bigwig \
+atacseq/bigwig/gG5_NE_0h_ATAC_TMMmerged.bigwig \
+atacseq/bigwig/gG5_NE_24h_ATAC_TMMmerged.bigwig \
+-R ChIPseq_ASCL1_mesconly10k.bed \
+ChIPseq_ASCL1_mescepilc10k.bed \
+ChIPseq_ASCL1_epilconly10k.bed \
+ChIPseq_ASCL1_epilcne10k.bed \
+ChIPseq_ASCL1_neonly10k.bed \
+ChIPseq_ASCL1_mescne10k.bed \
+ChIPseq_ASCL1_universal10k.bed \
+--beforeRegionStartLength 1000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 1000 \
+--missingDataAsZero -o deeptools/matrix/matrix_full_024_allcells.mat.gz
+
+plotHeatmap -m matrix/matrix_full_024_allcells.mat.gz -out plots/ascl1_chip_atac.png --whatToShow 'heatmap and colorbar' --samplesLabel "ASCL1" "ASCL1" "ASCL1" "ATAC no" "ATAC no" "ATAC no" "ATAC 24" "ATAC 24" "ATAC 24" --startLabel "" --endLabel "" --colorMap Greys Greys Greys Greens Greens Greens Greens Greens Greens --zMin 0 0 0 0 0 0 0 0 0 --zMax 100 100 100 25 25 25 25 25 25 --sortRegions descend
+
+```
+
+Fig 3D-E - deeptools heatmap of sites that are bound in NE only or mESC as well 
+
+```{bash}
+
+# run the Data dir for publication on RFS 
+
+computeMatrix scale-regions -S \
+chipseq_ascl1-ha/bigwig/gG5_NE_HA_RLE_merged.bigwig \
+atacseq/bigwig/gG5_NE_0h_ATAC_TMMmerged.bigwig \
+-R ChIPseq_653NEsites.bed \
+--beforeRegionStartLength 1000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 1000 \
+--missingDataAsZero -o deeptools/matrix/matrix_653_ne.mat.gz
+
+plotHeatmap -m deeptools/matrix/matrix_653_ne.mat.gz -out deeptools/plots/653_ne.png \
+--whatToShow 'heatmap and colorbar' --samplesLabel "ASCL1" "ATAC 0h" --startLabel "" --endLabel "" \
+--colorMap Greys Greens --zMin 0 0 --zMax 100 25 --sortRegions descend
+
+
+##
+
+computeMatrix scale-regions -S \
+chipseq_ascl1-ha/bigwig/gG5_NE_HA_RLE_merged.bigwig \
+atacseq/bigwig/gG5_NE_0h_ATAC_TMMmerged.bigwig \
+-R ChIPseq_653NEsites_openT0.bed \
+ChIPseq_653NEsites_closedT0.bed \
+--beforeRegionStartLength 1000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 1000 \
+--missingDataAsZero -o deeptools/matrix/matrix_653_ne_split.mat.gz
+
+plotHeatmap -m deeptools/matrix/matrix_653_ne_split.mat.gz -out deeptools/plots/653_ne_split.png \
+--whatToShow 'heatmap and colorbar' --samplesLabel "ASCL1" "ATAC 0h" --startLabel "" --endLabel "" \
+--colorMap Greys Greens --zMin 0 0 --zMax 100 25 --sortRegions descend
+
+##
+
+computeMatrix scale-regions -S \
+chipseq_ascl1-ha/bigwig/gG5_mESC_HA_RLE_merged.bigwig \
+atacseq/bigwig/gG5_mESC_0h_ATAC_TMMmerged.bigwig \
+atacseq/bigwig/gG5_mESC_24h_ATAC_TMMmerged.bigwig \
+-R ChIPseq_653NEsites_openT0.bed \
+ChIPseq_653NEsites_closedT0.bed \
+--beforeRegionStartLength 1000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 1000 \
+--missingDataAsZero -o deeptools/matrix/matrix_653_mesc_split.mat.gz
+
+plotHeatmap -m deeptools/matrix/matrix_653_mesc_split.mat.gz -out deeptools/plots/653_mesc_split.png \
+--whatToShow 'heatmap and colorbar' --samplesLabel "ASCL1" "ATAC 0h" "ATAC 24h" --startLabel "" --endLabel "" \
+--colorMap Greys Greens Greens --zMin 0 0 0 --zMax 100 25 25 --sortRegions descend
+
+##
+
+computeMatrix scale-regions -S \
+chipseq_ascl1-ha/bigwig/gG5_NE_HA_RLE_merged.bigwig \
+atacseq/bigwig/gG5_NE_0h_ATAC_TMMmerged.bigwig \
+atacseq/bigwig/gG5_NE_24h_ATAC_TMMmerged.bigwig \
+-R ChIPseq_653NEsites_openT0.bed \
+ChIPseq_653NEsites_closedT0.bed \
+--beforeRegionStartLength 1000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 1000 \
+--missingDataAsZero -o deeptools/matrix/matrix_653_ne_allT_split.mat.gz
+
+plotHeatmap -m deeptools/matrix/matrix_653_ne_allT_split.mat.gz -out deeptools/plots/653_ne_split_t024.png \
+--whatToShow 'heatmap and colorbar' --samplesLabel "ASCL1" "ATAC 0h" "ATAC 24h" --startLabel "" --endLabel "" \
+--colorMap Greys Greens Greens --zMin 0 0 0 --zMax 100 25 25 --sortRegions descend
+
+##
+
+computeMatrix scale-regions -S \
+chipseq_ascl1-ha/bigwig/gG5_NE_HA_RLE_merged.bigwig \
+atacseq/bigwig/gG5_NE_0h_ATAC_TMMmerged.bigwig \
+atacseq/bigwig/gG5_NE_6h_ATAC_TMMmerged.bigwig \
+atacseq/bigwig/gG5_NE_24h_ATAC_TMMmerged.bigwig \
+chipseq_ascl1-ha/bigwig/gG5_mESC_HA_RLE_merged.bigwig \
+atacseq/bigwig/gG5_mESC_0h_ATAC_TMMmerged.bigwig \
+atacseq/bigwig/gG5_mESC_6h_ATAC_TMMmerged.bigwig \
+atacseq/bigwig/gG5_mESC_24h_ATAC_TMMmerged.bigwig \
+chipseq_ascl1-ha/bigwig/gG5_EpiLC_HA_RLE_merged.bigwig \
+atacseq/bigwig/gG5_EpiLC_0h_ATAC_TMMmerged.bigwig \
+atacseq/bigwig/gG5_EpiLC_6h_ATAC_TMMmerged.bigwig \
+atacseq/bigwig/gG5_EpiLC_24h_ATAC_TMMmerged.bigwig \
+-R ChIPseq_653NEsites.bed \
+--beforeRegionStartLength 1000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 1000 \
+--missingDataAsZero -o deeptools/matrix/matrix_653_all_allT.mat.gz
+
+plotHeatmap -m deeptools/matrix/matrix_653_all_allT.mat.gz -out deeptools/plots/653_all_allT.png \
+--whatToShow 'heatmap and colorbar' --samplesLabel "ASCL1" "ATAC 0h" "ATAC 6h" "ATAC 24h" "ASCL1" "ATAC 0h" "ATAC 6h" "ATAC 24h" "ASCL1" "ATAC 0h" "ATAC 6h" "ATAC 24h" --startLabel "" --endLabel "" \
+--colorMap Greys Greens Greens Greens --zMin 0 0 0 0 0 0 0 0 0 0 0 0 --zMax 100 25 25 25 100 25 25 25 100 25 25 25 --sortRegions descend
+
+```
+
+Fig 3F - donut plots of percentage of sites that are bound & accessible in mESC and NE 
+
+```{r, messages=FALSE}
+
+library(here)
+library(GenomicRanges)
+library(ggplot2)
+library(dplyr)
+library(patchwork)
+
+all_653 <- read.table(file = here("../Data/ChIPseq_653NEsites.bed"), sep = "\t", col.names = c("seqnames", "start", "end", "width", "strand", "peakID", "peakset"))
+all_653.gr <- all_653 %>% GRanges()
+
+# 417 are not in mESC
+not_mesc <- read.table(file = here("../Data/ChIPseq_653NEsites_splitnotmesc.bed"), sep = "\t", col.names = c("seqnames", "start", "end", "width", "strand", "peakID", "peakset"))
+not_mesc.gr <- not_mesc %>% GRanges()
+
+# 236 are in mESC
+also_mesc <- read.table(file = here("../Data/ChIPseq_653NEsites_splitmesc.bed"), sep = "\t", col.names = c("seqnames", "start", "end", "width", "strand", "peakID", "peakset"))
+also_mesc.gr <- also_mesc %>% GRanges()
+
+
+### 653 ne sites 
+all_653 <- read.table(file = here("../Data/ChIPseq_653NEsites.bed"), sep = "\t", col.names = c("seqnames", "start", "end", "width", "strand", "peakID", "peakset"))
+all_653.gr <- all_653 %>% GRanges()
+
+## mesc atac t0
+mesc.atac <- read.table(file = here("../Data/ATACseq_mESC_0h_peaks_in3of4.bed"), col.names = c("seqnames", "start", "end", "peakID"))
+mesc.atac.gr <- mesc.atac %>% GRanges()
+
+# Overlapping (min 50bp overlap)
+all_362_mesc_atac <- subsetByOverlaps(all_653.gr, mesc.atac.gr, minoverlap = 50)
+
+# mESC_NE and Universal
+mesc_universal.gr <- all_362_mesc_atac[all_362_mesc_atac$peakset %in% c("mESC_NE", "Universal")]
+
+# NE and EpiLC_NE
+ne_epilc.gr <- all_362_mesc_atac[all_362_mesc_atac$peakset %in% c("NE", "EpiLC_NE")]
+
+cat("mESC_NE + Universal:", length(mesc_universal.gr), "\n")
+cat("NE + EpiLC_NE:", length(ne_epilc.gr), "\n")
+
+# mESC_NE and Universal
+write.table(as.data.frame(mesc_universal.gr), 
+            file = here("../Data/ChIPseq_362_openmesc_boundmesc.bed"), 
+            sep = "\t", row.names = FALSE, quote = FALSE, col.names = FALSE)
+
+# NE and EpiLC_NE
+write.table(as.data.frame(ne_epilc.gr), 
+            file = here("../Data/ChIPseq_362_openmesc_notboundmesc.bed"), 
+            sep = "\t", row.names = FALSE, quote = FALSE, col.names = FALSE)
+
+# do these sites overlap with atac 0hr peaks ?
+
+# load in the mesc peaks t=0 
+mesc.atac <- read.table(file = here("../Data/ATACseq_mESC_0h_peaks_in3of4.bed"), col.names = c("seqnames", "start", "end", "peakID"))
+mesc.atac.gr <- mesc.atac %>% GRanges()
+
+# load in the mesc peaks t=24
+mesc.atac.24 <- read.table(file = here("../Data/ATACseq_mESC_24h_peaks_in3of4.bed"), col.names = c("seqnames", "start", "end", "peakID"))
+mesc.atac.24.gr <- mesc.atac.24 %>% GRanges()
+
+# load in the ne peaks t=0
+ne.atac <- read.table(file = here("../Data/ATACseq_NE_0h_peaks_in3of4.bed"), col.names = c("seqnames", "start", "end", "peakID"))
+ne.atac.gr <- ne.atac %>% GRanges()
+
+
+# find overlaps 
+
+calc_open <- function(gr_sites, gr_atac) {
+
+  hits <- countOverlaps(gr_sites, gr_atac, minoverlap = 50) > 0
+
+  data.frame(
+    status = c("Open", "Closed"),
+    count = c(sum(hits), sum(!hits))
+  )
+}
+
+not_mesc_mescATAC <- calc_open(not_mesc.gr, mesc.atac.gr)
+not_mesc_neATAC   <- calc_open(not_mesc.gr, ne.atac.gr)
+
+also_mesc_mescATAC <- calc_open(also_mesc.gr, mesc.atac.gr)
+also_mesc_neATAC   <- calc_open(also_mesc.gr, ne.atac.gr)
+
+all653_ne <- calc_open(all_653.gr, ne.atac.gr)
+
+all653_mesc <- calc_open(all_653.gr, mesc.atac.gr)
+
+all653_mesc24 <- calc_open(all_653.gr, mesc.atac.24.gr)
+
+# plot donut plot to show % of sites that are open (e.g overlap with atac peak) in mESC and then in NE, for each of the two sets of ChIPseq sites - so four plots in total
+
+plot_donut <- function(df) {
+
+  df <- df %>%
+    mutate(status = factor(status, levels = c("Closed", "Open"))) %>%
+    arrange(status)
+
+  pct_open <- round(100 * df$count[df$status == "Open"] / sum(df$count), 1)
+
+  ggplot(df, aes(x = 2, y = count, fill = status)) +
+    geom_col(width = 1, colour = NA) +
+    coord_polar(theta = "y", direction = -1) + 
+    xlim(0.5, 2.5) + # this makes it donut
+    scale_fill_manual(values = c("grey", "#00cc00")) +
+    theme_void() +
+    theme(legend.position = "none")
+}
+
+p0 <- plot_donut(all653_ne)
+ggsave(p0, filename = here("../Figures/Fig4F-ne0.png"), bg = "white", dpi = 300, height = 3, width = 3)
+
+p653_mesc0 <- plot_donut(all653_mesc)
+ggsave(filename = here("../Figures/Fig4F-mesc0.png"), bg = "white", dpi = 300, height = 3, width = 3)
+
+p653_mesc24 <- plot_donut(all653_mesc24)
+ggsave(filename = here("../Figures/Fig4F-mesc24.png"), bg = "white", dpi = 300, height = 3, width = 3)
+
+p1 <- plot_donut(not_mesc_mescATAC)
+ggsave(filename = here("../Figures/Fig4E-1.png"), bg = "white", dpi = 300, height = 3, width = 3)
+
+p2 <- plot_donut(not_mesc_neATAC)
+ggsave(filename = here("../Figures/Fig4E-2.png"), bg = "white", dpi = 300, height = 3, width = 3)
+
+p3 <- plot_donut(also_mesc_mescATAC)
+ggsave(filename = here("../Figures/Fig4F-1.png"), bg = "white", dpi = 300, height = 3, width = 3)
+
+p4 <- plot_donut(also_mesc_neATAC)
+ggsave(filename = here("../Figures/Fig4F-2.png"), bg = "white", dpi = 300, height = 3, width = 3)
+
+```
+
+```{r, messages=FALSE}
+
+library(here)
+library(GenomicRanges)
+library(ggplot2)
+library(dplyr)
+library(patchwork)
+
+# 653 are not in mESC
+nesites <- read.table(file = here("../Data/ChIPseq_653NEsites.bed"), sep = "\t", col.names = c("seqnames", "start", "end", "width", "strand", "peakID", "peakset"))
+nesites.gr <- nesites %>% GRanges()
+
+# do these sites overlap with atac 0hr peaks ?
+
+# load in the ne peaks t=0
+ne.atac0 <- read.table(file = here("../Data/ATACseq_NE_0h_peaks_in3of4.bed"), col.names = c("seqnames", "start", "end", "peakID"))
+ne.atac0.gr <- ne.atac0 %>% GRanges()
+
+# load in the ne peaks t=24
+ne.atac24 <- read.table(file = here("../Data/ATACseq_NE_24h_peaks_in3of4.bed"), col.names = c("seqnames", "start", "end", "peakID"))
+ne.atac24.gr <- ne.atac24 %>% GRanges()
+
+
+calc_open <- function(gr_sites, gr_atac) {
+
+  hits <- countOverlaps(gr_sites, gr_atac, minoverlap = 50) > 0
+
+  data.frame(
+    status = c("Open", "Closed"),
+    count = c(sum(hits), sum(!hits))
+  )
+}
+
+nesites.open0 <- calc_open(nesites.gr, ne.atac0.gr)
+nesites.open24 <- calc_open(nesites.gr, ne.atac24.gr)
+
+nesites.open0 <- nesites.gr[countOverlaps(nesites.gr, ne.atac0.gr, minoverlap = 50) > 0]
+
+nesites.closed0 <- nesites.gr[!countOverlaps(nesites.gr, ne.atac0.gr, minoverlap = 50) > 0]
+
+nesites.open0.export <- nesites.open0 %>% as.data.frame()
+nesites.closed0.export <- nesites.closed0 %>% as.data.frame()
+
+# 160 NE sites are closed at t 0
+write.table(nesites.closed0.export, file = here("../Data/ChIPseq_653NEsites_closedT0.bed"), sep = "\t", row.names = FALSE, quote = FALSE, col.names = FALSE)
+
+# 493 NE sites are open at t 0
+write.table(nesites.open0.export, file = here("../Data/ChIPseq_653NEsites_openT0.bed"), sep = "\t", row.names = FALSE, quote = FALSE, col.names = FALSE)
+
+pNEt24 <- plot_donut(nesites.open24)
+ggsave(pNEt24, filename = here("../Figures/Fig4F-ne24.png"), bg = "white", dpi = 300, height = 3, width = 3)
+
+```
+
+```{bash}
+
+computeMatrix scale-regions -S \
+atacseq/bigwig/gG5_NE_0h_ATAC_TMMmerged.bigwig \
+atacseq/bigwig/gG5_NE_24h_ATAC_TMMmerged.bigwig \
+-R ChIPseq_653NEsites_closedT0.bed \
+--beforeRegionStartLength 1000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 1000 \
+--missingDataAsZero -o deeptools/matrix/matrix_653_ne_t024.mat.gz
+
+plotProfile -m deeptools/matrix/matrix_653_ne_t024.mat.gz \
+-out deeptools/plots/closedNE_atac_profile.png --perGroup --samplesLabel 0 24 \
+--colors "#00cc00" "#008000" --startLabel "" --endLabel "" --yMax 10
+
+computeMatrix scale-regions -S \
+atacseq/bigwig/gG5_NE_0h_ATAC_TMMmerged.bigwig \
+atacseq/bigwig/gG5_NE_24h_ATAC_TMMmerged.bigwig \
+-R ChIPseq_653NEsites_openT0.bed \
+--beforeRegionStartLength 1000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 1000 \
+--missingDataAsZero -o deeptools/matrix/matrix_653_ne_t024_open.mat.gz
+
+plotProfile -m deeptools/matrix/matrix_653_ne_t024_open.mat.gz \
+-out deeptools/plots/openNE_atac_profile.png --perGroup --samplesLabel 0 24 \
+--colors "#00cc00" "#008000" --startLabel "" --endLabel "" --yMax 30 --plotHeight 6 --plotWidth 6
+
+####
+
+computeMatrix scale-regions -S \
+atacseq/bigwig/gG5_NE_0h_ATAC_TMMmerged.bigwig \
+atacseq/bigwig/gG5_NE_24h_ATAC_TMMmerged.bigwig \
+-R ChIPseq_653NEsites_openT0.bed \
+--beforeRegionStartLength 1000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 1000 \
+--missingDataAsZero -o deeptools/matrix/matrix_653_ne_t024_open.mat.gz
+
+plotProfile -m deeptools/matrix/matrix_653_ne_t024_open.mat.gz \
+-out deeptools/plots/openNE_atac_profile.png --perGroup --samplesLabel 0 24 \
+--colors "#00cc00" "#008000" --startLabel "" --endLabel "" --yMax 30 --plotHeight 6 --plotWidth 6
+
+
+####
+
+computeMatrix scale-regions -S \
+bigwigs/gG5_NE_0h_ATAC_TMMmerged.bigwig \
+bigwigs/gG5_NE_6h_ATAC_TMMmerged.bigwig \
+bigwigs/gG5_NE_24h_ATAC_TMMmerged.bigwig \
+-R beds/ChIPseq_653NEsites_closedT0.bed \
+--beforeRegionStartLength 1000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 1000 \
+--missingDataAsZero -o matrix/matrix_ascl1chip_closedNE_NE.mat.gz -p 70
+ 
+plotProfile -m matrix/matrix_ascl1chip_closedNE_NE.mat.gz \
+-out plots/closedNE_neatac_profile.png --perGroup --samplesLabel 0 6 24 \
+--colors "#00e600" "#00cc00" "#008000" --startLabel "" --endLabel "" --yMax 10
+
+
+computeMatrix scale-regions -S \
+bigwigs/gG5_EpiLC_0h_ATAC_TMMmerged.bigwig \
+bigwigs/gG5_EpiLC_6h_ATAC_TMMmerged.bigwig \
+bigwigs/gG5_EpiLC_24h_ATAC_TMMmerged.bigwig \
+-R beds/ChIPseq_653NEsites_closedT0.bed \
+--beforeRegionStartLength 1000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 1000 \
+--missingDataAsZero -o matrix/matrix_ascl1chip_closedNE_EpiLC.mat.gz -p 70
+ 
+plotProfile -m matrix/matrix_ascl1chip_closedNE_EpiLC.mat.gz \
+-out plots/closedNE_epilcatac_profile.png --perGroup --samplesLabel 0 6 24 \
+--colors "#00e600" "#00cc00" "#008000" --startLabel "" --endLabel "" --yMax 10
+
+```
+
+```{r, messages=FALSE}
+
+library(GenomicRanges)
+library(here)
+library(tidyverse)
+
+# 653 are not in mESC
+nesites <- read.table(file = here("../Data/ChIPseq_653NEsites.bed"), sep = "\t", col.names = c("seqnames", "start", "end", "width", "strand", "peakID", "peakset"))
+nesites.gr <- nesites %>% GRanges()
+
+# do these sites overlap with atac 0hr peaks ?
+
+# load in the ne peaks t=0
+ne.atac0 <- read.table(file = here("../Data/ATACseq_NE_0h_peaks_in3of4.bed"), col.names = c("seqnames", "start", "end", "peakID"))
+ne.atac0.gr <- ne.atac0 %>% GRanges()
+
+# load in the ne peaks t=24
+ne.atac24 <- read.table(file = here("../Data/ATACseq_NE_24h_peaks_in3of4.bed"), col.names = c("seqnames", "start", "end", "peakID"))
+ne.atac24.gr <- ne.atac24 %>% GRanges()
+
+nesites.closed0 <- nesites.gr[!countOverlaps(nesites.gr, ne.atac0.gr, minoverlap = 50) > 0] # 160 of these are closed 
+
+nesites.opened <- nesites.closed0[countOverlaps(nesites.closed0, ne.atac24.gr, minoverlap = 50 ) > 0]
+
+nesites.opened.export <- nesites.opened %>% as.data.frame()
+
+# 109/160 NE sites are closed at t 0 and open at t24 
+write.table(nesites.opened.export, file = here("../Data/ChIPseq_653NEsites_opened.bed"), sep = "\t", row.names = FALSE, quote = FALSE, col.names = FALSE)
+
+```
+
+
+# FIG S3
+
+Fig S3A - number of ATAC-seq peaks in each sample 
+
+```{r, messages=FALSE}
+
+library(here)
+library(tidyverse)
+library(DiffBind)
+library(AnnotationHub)
+library(cowplot)
+
+atac_samples <- read.csv(here("../Data/ATACseq/atacseq_diffbindSamples.csv"))
+
+# built-in blacklist function only uses ENCODE, mm39 not yet available so import custom 
+# import from https://github.com/dozmorovlab/excluderanges 
+ah <- AnnotationHub()
+# mm39 ID is AH107321
+atac_blacklist_mm39 <- ah[["AH107321"]]
+rm(ah)
+
+atac_data <- dba(sampleSheet = atac_samples, minOverlap = 1) # this includes all peaks
+atac_data <- dba.blacklist(atac_data, blacklist = atac_blacklist_mm39, greylist = FALSE) 
+# Applying blacklist...
+# Removed: 198227 of 4703301 intervals.
+# Removed: 13827 merged (of 355316) and 81704 (of 355316) consensus.
+
+atac_consensus_perCond <- dba.peakset(atac_data, consensus = DBA_TREATMENT, minOverlap = 3) # this takes peaks that are in 3/4 samples 
+atac_consensus_full <- dba(atac_consensus_perCond, mask = atac_consensus_perCond$masks$Consensus, minOverlap = 1)
+
+
+
+peaks_df <- dba.show(atac_data) %>% as.data.frame()
+peaks_df$Treatment <- factor(peaks_df$Treatment, levels = c("mESC_0h", "mESC_6h", "mESC_24h", "EpiLC_0h", "EpiLC_6h", "EpiLC_24h", "NE_0h", "NE_6h", "NE_24h"))
+
+cons_df <- dba.show(atac_consensus_full) %>% as.data.frame()
+cons_df$Treatment <- factor(cons_df$Treatment, levels = c("mESC_0h", "mESC_6h", "mESC_24h", "EpiLC_0h", "EpiLC_6h", "EpiLC_24h", "NE_0h", "NE_6h", "NE_24h"))
+
+
+colours_9 <- list("mESC_0h" = "#AAE4E9","mESC_6h" = "#79C9D1","mESC_24h" = "#4FAAB2",
+                  "EpiLC_0h" = "#FFE8B9","EpiLC_6h" = "#FFDC92","EpiLC_24h" = "#FFD170",
+                  "NE_0h" = "#FFBCB9","NE_6h" = "#FF9792","NE_24h" = "#FF7770")
+
+peakplot <- ggplot(data = subset(peaks_df, grepl("_", ID)), aes(x = Treatment, y = Intervals/1000, fill = Treatment)) +
+  geom_boxplot(aes(fill = Treatment), outlier.shape = NA) +  # Boxplot retains the legend
+  geom_point(position=position_jitterdodge(), size = 4, shape = 16, color = "black") +
+  geom_point(data = cons_df, aes(x = Treatment, y = Intervals/1000, color = "Consensus set \n in 3 of 4 \n replicates"), size = 3, shape = 8) +  # Add legend for consensus points
+  scale_fill_manual(name = "", values = colours_9) + 
+  scale_color_manual(name = "", values = c("Consensus set \n in 3 of 4 \n replicates" = "black")) +  # Custom legend entry for consensus points
+  guides(fill = guide_legend(override.aes = list(shape = NA))) + # this excludes the shape being plotted for the boxplot legend 
+  theme_cowplot() +
+  theme(legend.position = "none",  # Adjust as needed
+        strip.text.x = element_text(size = 10, face = "bold"),
+        axis.title = element_text(size = 20),  # Axis titles font size 20
+        axis.text = element_text(size = 16),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) + 
+  labs(title = element_blank(),
+       x = element_blank(),
+       y = expression(paste("Number of peaks (", 10^3, ")")))
+
+peakplot
+
+ggsave(plot = peakplot, filename = here("../Figures/FigS3A.png"), dpi = 300, width = 5, height = 5, units = "in", bg= "white")
+
+```
+
+Fig S3B - FRiP % of ATAC-seq samples
+
+```{r, messages=FALSE}
+
+library(here)
+library(tidyverse)
+library(DiffBind)
+library(cowplot)
+
+atac_diffbind <- readRDS(file = here("../Data/ATACseq_counted_nochrUn.Rds"))
+
+info <- dba.show(atac_diffbind)
+info$Treatment <- factor(info$Treatment, levels = c("mESC_0h", "mESC_6h", "mESC_24h", "EpiLC_0h", "EpiLC_6h", "EpiLC_24h", "NE_0h", "NE_6h", "NE_24h"))
+info <- info %>% mutate("frip_pcnt" = FRiP * 100)
+
+colours_9 <- list("mESC_0h" = "#AAE4E9","mESC_6h" = "#79C9D1","mESC_24h" = "#4FAAB2",
+                  "EpiLC_0h" = "#FFE8B9","EpiLC_6h" = "#FFDC92","EpiLC_24h" = "#FFD170",
+                  "NE_0h" = "#FFBCB9","NE_6h" = "#FF9792","NE_24h" = "#FF7770")
+
+frip <- ggplot(info, aes(x = Treatment, y = frip_pcnt, fill = Treatment)) +
+  geom_boxplot(show.legend = FALSE) +
+  # geom_bar(stat = "summary", fun = mean) +
+  scale_fill_manual(values = colours_9) +
+  geom_point(position=position_jitterdodge(), size = 4, shape = 16, color = "black") +
+  labs(title = NULL,
+       x = NULL,
+       y = "FRiP (%)"
+  ) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 40)) +
+  theme_cowplot() +
+  theme(
+    axis.title = element_text(size = 20),  # Axis titles font size 20
+    axis.text = element_text(size = 16),
+    axis.text.x=element_blank(),
+    axis.ticks.x=element_blank(),
+    legend.position = "none"
+  )
+
+frip
+
+ggsave(plot = frip, filename = here("../Figures/FigS3B.png"), width = 5, height = 5, device = "png", dpi = 300, bg= "white")
+
+```
+
+Fig S3C - TSS enrichment 
+
+```{r, messages=FALSE}
+
+library(here)
+library(tidyverse)
+library(ggplot2)
+library(cowplot)
+
+tss_reads <- read_delim(file = here("../Data/ATACseq/tss_enrichment/readCountInPeaks.txt.summary"), show_col_types = F)
+flank_reads <- read_delim(file = here("../Data/ATACseq/tss_enrichment/readCountInFlanks.txt.summary"), show_col_types = F)
+
+# Convert to long format and extract sample names
+tss_reads_long <- tss_reads %>%
+  pivot_longer(-Status, names_to = "Sample", values_to = "TSS Reads") %>%
+  mutate(Sample = basename(Sample) %>% str_remove(".nodup.bam")) %>%
+  filter(Status == "Assigned")  # Keep only Assigned reads
+
+flank_reads_long <- flank_reads %>%
+  pivot_longer(-Status, names_to = "Sample", values_to = "Flank Reads") %>%
+  mutate(Sample = basename(Sample) %>% str_remove(".nodup.bam")) %>%
+  filter(Status == "Assigned")  # Keep only Assigned reads
+
+summary <- tss_reads_long %>% right_join(flank_reads_long) %>% mutate("Enrichment" = `TSS Reads`/`Flank Reads`) %>% mutate("Cell" = str_split_i(Sample, "_", i = 2)) %>% mutate("Time" = str_split_i(Sample, "_", i = 3)) %>% mutate("Condition" = paste(Cell, Time, sep = "_"))
+summary$Condition <- factor(summary$Condition, levels = c("mESC_0h", "mESC_6h", "mESC_24h", "EpiLC_0h", "EpiLC_6h", "EpiLC_24h", "NE_0h", "NE_6h", "NE_24h"))
+
+# summary.0h <- summary %>% dplyr::filter(Condition %in% c("mESC_0h", "EpiLC_0h", "NE_0h"))
+  
+  
+# # Compute total Unassigned for each sample
+# df_summary <- df_long %>%
+#   group_by(Sample) %>%
+#   summarise(Assigned = sum(Reads[Status == "Assigned"]),
+#             Unassigned = sum(Reads[Status != "Assigned"]))
+
+colours_9 <- list("mESC_0h" = "#AAE4E9","mESC_6h" = "#79C9D1","mESC_24h" = "#4FAAB2",
+                  "EpiLC_0h" = "#FFE8B9","EpiLC_6h" = "#FFDC92","EpiLC_24h" = "#FFD170",
+                  "NE_0h" = "#FFBCB9","NE_6h" = "#FF9792","NE_24h" = "#FF7770")
+
+
+# Plot the data
+tss <- ggplot(data = summary, aes(x = Condition, y = Enrichment, fill = Condition)) +
+  geom_boxplot() +
+  geom_point(position=position_jitterdodge(), size = 4, shape = 16, color = "black") +
+  scale_fill_manual(values = colours_9) +
+  theme_cowplot() +
+  labs(title = element_blank(),
+       x = element_blank(),
+       y = "TSS Enrichment") +
+  theme(
+    axis.title = element_text(size = 20),  # Axis titles font size 20
+    axis.text = element_text(size = 16),
+    axis.text.x=element_blank(),
+    axis.ticks.x=element_blank(),
+    legend.position = "none"
+  ) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 30))
+
+
+ggsave(plot = tss, filename = here("../Figures/FigS3C.png"), width = 5, height = 5, device = "png", dpi = 300, bg= "white")
+
+```
+
+Fig S3D - chrM reads
+
+```{r, messages=FALSE}
+library(here)
+library(tidyverse)
+
+mitochondria <- read_delim(file = here("../Data/ATACseq/mtDNA_content.txt"), show_col_types = FALSE)
+
+mitochondria <- mitochondria %>%
+  separate(Sample, into = c("Condition", "Replicate"), sep = "_rep") %>%  # Split Sample into Condition and Replicate
+  mutate(
+    Replicate = paste0("rep", Replicate),  # Add "rep" back to the Replicate column
+    Condition = str_remove(Condition, "^gG5_"),  # Remove the 'gG5_' prefix from Condition
+    mtDNA_Content = parse_number(`mtDNA_Content(%)`)  # Convert mtDNA_Content(%) to numeric by removing the %
+  )
+
+mitochondria$Condition <- factor(mitochondria$Condition, levels = c("mESC_0h", "mESC_6h", "mESC_24h", "EpiLC_0h", "EpiLC_6h", "EpiLC_24h", "NE_0h", "NE_6h", "NE_24h"))
+
+colours_9 <- list("mESC_0h" = "#AAE4E9","mESC_6h" = "#79C9D1","mESC_24h" = "#4FAAB2",
+                  "EpiLC_0h" = "#FFE8B9","EpiLC_6h" = "#FFDC92","EpiLC_24h" = "#FFD170",
+                  "NE_0h" = "#FFBCB9","NE_6h" = "#FF9792","NE_24h" = "#FF7770")
+
+pcntMit <- ggplot(mitochondria, aes(x = Condition, y = mtDNA_Content, fill = Condition)) +
+  # geom_bar(stat = "summary", fun = mean) +
+  geom_boxplot() +
+  scale_fill_manual(values = colours_9) +
+  geom_point(position=position_jitterdodge(), size = 4, shape = 16, color = "black") +
+  labs(title = element_blank(),
+       x = element_blank(),
+       y = "% Mitochondrial Reads"
+  ) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 5)) +
+  theme_cowplot() +
+  theme(
+    axis.title = element_text(size = 20),  # Axis titles font size 20
+    axis.text = element_text(size = 16),
+    axis.text.x=element_blank(),
+    axis.ticks.x=element_blank(),
+    legend.position = "none"
+  )
+
+ggsave(plot = pcntMit, filename = here("../Figures/FigS3D.png"), width = 5, height = 5, device = "png", dpi = 300, bg= "white")
+```
+
+
+# FIG 4
+
+Fig 4A - heatmap to show 653 NE sites open or closed in mESC
+
+```{bash}
+
+computeMatrix scale-regions -S \
+chipseq_ascl1-ha/bigwig/gG5_mESC_HA_RLE_merged.bigwig \
+atacseq/bigwig/gG5_mESC_0h_ATAC_TMMmerged.bigwig \
+-R ChIPseq_653NEsites.bed \
+--beforeRegionStartLength 1000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 1000 \
+--missingDataAsZero -o deeptools/matrix/matrix_653_mesc.mat.gz
+
+plotHeatmap -m deeptools/matrix/matrix_653_mesc.mat.gz -out deeptools/plots/653_mesc.png \
+--whatToShow 'heatmap and colorbar' --samplesLabel "ASCL1" "ATAC 0h" --startLabel "" --endLabel "" \
+--colorMap Greys Greens --zMin 0 0 --zMax 100 25 --sortRegions descend
+
+```
+
+Fig 4C-D - mesc open bound and not bound plus histone profile 
+
+```{bash}
+##
+
+computeMatrix scale-regions -S \
+Data/chipseq_ascl1-ha/bigwig/gG5_mESC_HA_RLE_merged.bigwig \
+Data/atacseq/bigwig/gG5_mESC_0h_ATAC_TMMmerged.bigwig \
+Data/chipseq_published/cruzmolina2017/2i_H3K27ac_mm39.bw \
+Data/chipseq_published/cruzmolina2017/AntNPC_H3K27ac_mm39.bw \
+-R Data/ChIPseq_362_openmesc_boundmesc.bed \
+Data/ChIPseq_362_openmesc_notboundmesc.bed \
+--beforeRegionStartLength 2000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 2000 \
+--missingDataAsZero -o Data/deeptools/matrix/matrix_362_split_mescboundornot.mat.gz
+
+plotHeatmap -m Data/deeptools/matrix/matrix_362_split_mescboundornot.mat.gz -out Data/deeptools/plots/362_mescsplit.png \
+--whatToShow 'heatmap and colorbar' --samplesLabel "ASCL1" "ATAC 0h" "H3K27ac 2i" "H3K27ac AntNPC" --startLabel "" --endLabel "" \
+--colorMap Greys Greens Blues Blues --zMin 0 0 0 0 --zMax 100 25 10 10 --sortRegions descend
+
+
+###
+
+computeMatrix scale-regions -S \
+Data/chipseq_published/cruzmolina2017/2i_H3K27ac_mm39.bw \
+Data/chipseq_published/cruzmolina2017/AntNPC_H3K27ac_mm39.bw \
+-R Data/ChIPseq_362_openmesc_boundmesc.bed \
+Data/ChIPseq_362_openmesc_notboundmesc.bed \
+--beforeRegionStartLength 5000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 5000 \
+--missingDataAsZero -o Data/deeptools/matrix/matrix_362_split_mescboundornot_h3k27.mat.gz
+
+plotProfile -m Data/deeptools/matrix/matrix_362_split_mescboundornot_h3k27.mat.gz -out Data/deeptools/plots/362_mescsplit_h3k27ac.png \
+--whatToShow 'heatmap and colorbar' --samplesLabel "H3K27ac 2i" "H3K27ac AntNPC" --startLabel "" --endLabel "" \
+--colorMap  Blues --zMin 0 0 --zMax 20 20 --sortRegions descend --plotHeight 10 --plotWidth 10
+
+
+
+```
+
+Fig 4E - specific gene counts for Ank2 Cyth1 Hes5 (no EpiLC)
+
+```{r}
+library(here)
+library(AnnotationHub)
+library(tidyverse)
+library(ggplot2)
+library(DESeq2)
+library(cowplot)
+
+# load in the rna-seq rds object
+# these counts are corrected for library size and Tx length
+rna <- readRDS(file = here("../Data/RNAseq_ASCL1_dds.Rds"))
+rna <- estimateSizeFactors(rna)
+rnaseq_counts <- counts(object = rna, normalized = TRUE)
+# 
+# # write to a csv 
+# write.csv(rnaseq_counts, file = here("../results/countsmatrix_normalised.csv"))
+
+# need to annotate the row names to gene symbols
+ah <- AnnotationHub()
+# ah object ID for the mm39 108 ensembl build is AH109367
+EnsDb.Mmusculus.v108 <- ah[["AH109367"]]
+genes <- genes(EnsDb.Mmusculus.v108, return.type = "DataFrame")
+gene2symbol <- genes[c(1,12)]
+gene2symbol_matched <- gene2symbol$symbol[match(rownames(rnaseq_counts), gene2symbol$gene_id)]
+# annotate the rna-seq table
+rownames(rnaseq_counts) <- gene2symbol_matched
+
+colours <- c("C11_mESC_t24" = "lightgrey", "C11_NE_t24" = "lightgrey",
+             "gG5_mESC_t0" = "#AAE4E9","gG5_mESC_t6" = "#79C9D1","gG5_mESC_t24" = "#4FAAB2",
+             "gG5_NE_t0" = "#FFBCB9","gG5_NE_t6" = "#FF9792","gG5_NE_t24" = "#FF7770")
+
+
+# before generating the heatmap, want to change the order so that the C11 columns are next to the t0 columns 
+desired_order <- c(
+  # mESC
+  "exp1_C11_mESC_t24_rep1", "exp1_C11_mESC_t24_rep2", "exp1_C11_mESC_t24_rep3",
+  "exp2_gG5_mESC_t0_rep1", "exp2_gG5_mESC_t0_rep2", "exp2_gG5_mESC_t0_rep3", "exp2_gG5_mESC_t0_rep4",
+  "exp2_gG5_mESC_t6_rep1", "exp2_gG5_mESC_t6_rep2", "exp2_gG5_mESC_t6_rep3", "exp2_gG5_mESC_t6_rep4",
+  "exp1_gG5_mESC_t24_rep1", "exp1_gG5_mESC_t24_rep2", "exp1_gG5_mESC_t24_rep3", 
+  "exp2_gG5_mESC_t24_rep1", "exp2_gG5_mESC_t24_rep2", "exp2_gG5_mESC_t24_rep3", "exp2_gG5_mESC_t24_rep4",
+  
+  # NE
+  "exp1_C11_NE_t24_rep1", "exp1_C11_NE_t24_rep2", "exp1_C11_NE_t24_rep3", 
+  "exp2_gG5_NE_t0_rep1", "exp2_gG5_NE_t0_rep2", "exp2_gG5_NE_t0_rep3", "exp2_gG5_NE_t0_rep4",
+  "exp2_gG5_NE_t6_rep1", "exp2_gG5_NE_t6_rep2", "exp2_gG5_NE_t6_rep3", "exp2_gG5_NE_t6_rep4",
+  "exp1_gG5_NE_t24_rep1", "exp1_gG5_NE_t24_rep2", "exp1_gG5_NE_t24_rep3", 
+  "exp2_gG5_NE_t24_rep1", "exp2_gG5_NE_t24_rep2", "exp2_gG5_NE_t24_rep3", "exp2_gG5_NE_t24_rep4"
+)
+
+# Reorder the heatmap data and annotation
+rnaseq_counts <- rnaseq_counts[, desired_order]
+
+genes.ofi <- c("Ank2", "Cyth1", "Hes5")# <- replace with your list
+
+# Loop through each gene and create + save the plot
+for (gene.ofi in genes.ofi) {
+  
+  # Get counts for current gene
+  log.counts.ofi <- log2(rnaseq_counts[gene.ofi, ] + 1)
+  counts.ofi <- rnaseq_counts[gene.ofi, ]
+  
+  # Create plot
+  gg.logtpmBox <- counts.ofi %>%
+    tibble::as_tibble() %>%
+    mutate(sample = names(counts.ofi)) %>%
+    separate(sample, c('exp', 'line', 'cell', 'time', 'rep'), sep = '_') %>%
+    mutate(cond_time = paste(line, cell, time, sep = "_")) %>%
+    mutate(cond_time = factor(cond_time, levels = unique(cond_time))) %>%
+    ggplot(aes(x = cond_time, y = value, fill = cond_time)) +
+    geom_boxplot(width = 0.7, outlier.shape = NA, color = "black", size = 0.3) +
+    geom_point(
+      aes(fill = cond_time),
+      position = position_jitter(width = 0.1, height = 0),
+      size = 2, shape = 21, color = "black"
+    ) +
+    xlab('') +
+    #ylab(bquote(log[2]~"(scaled counts + 1)")) +
+    ylab("scaled counts") +
+    scale_fill_manual(values = colours) +
+    scale_color_manual(values = colours) +
+    scale_y_continuous(limits = c(NA, NA)) +
+    theme_cowplot() +
+    labs(title = gene.ofi) +
+    theme(
+      legend.position = 'none',
+      axis.line.x = element_line(linewidth = 0.4),
+      axis.line.y = element_line(linewidth = 0.4),
+      axis.line = element_line(linetype = 'solid'),
+      axis.text.x = element_blank(),
+      axis.title.y = element_blank(),
+      plot.title = element_text(size = 16, face = "italic", hjust = 0.5)
+    )
+  
+  # Save the plot
+  ggsave(
+    plot = gg.logtpmBox,
+    filename = here("../Figures/", paste0("RNAseq_", gene.ofi, "_noEpiLC.png")),
+    device = "png", units = "cm", width = 5.5, height = 8, bg = "white"
+  )
+}
+
+```
+
+
+# FIG S4
+
+Fig S4A - heatmap for ASCL1-ChIPseq peaks split by cell type 
+
+```{bash}
+computeMatrix scale-regions -S \
+chipseq_ascl1-ha/bigwig/gG5_mESC_HA_RLE_merged.bigwig \
+chipseq_ascl1-ha/bigwig/gG5_EpiLC_HA_RLE_merged.bigwig \
+chipseq_ascl1-ha/bigwig/gG5_NE_HA_RLE_merged.bigwig \
+-R ChIPseq_ASCL1_mesconly10k.bed \
+ChIPseq_ASCL1_mescepilc10k.bed \
+ChIPseq_ASCL1_epilconly10k.bed \
+ChIPseq_ASCL1_epilcne10k.bed \
+ChIPseq_ASCL1_neonly10k.bed \
+ChIPseq_ASCL1_mescne10k.bed \
+ChIPseq_ASCL1_universal10k.bed \
+--beforeRegionStartLength 1000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 1000 \
+--missingDataAsZero -o deeptools/matrix/matrix_ascl1chip.mat.gz
+```
+
+Fig S4B - heatmap for H3K27ac 
+
+```{bash}
+
+computeMatrix scale-regions -S \
+Data/chipseq_published/cruzmolina2017/2i_H3K27ac_mm39.bw \
+Data/chipseq_published/cruzmolina2017/AntNPC_H3K27ac_mm39.bw \
+-R ChIPseq_ASCL1_mesconly10k.bed \
+ChIPseq_ASCL1_mescepilc10k.bed \
+ChIPseq_ASCL1_epilconly10k.bed \
+ChIPseq_ASCL1_epilcne10k.bed \
+ChIPseq_ASCL1_neonly10k.bed \
+ChIPseq_ASCL1_mescne10k.bed \
+ChIPseq_ASCL1_universal10k.bed \
+--beforeRegionStartLength 5000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 5000 \
+--missingDataAsZero -o Data/deeptools/matrix/matrix_h3k27ac_allsites.mat.gz
+
+```
+
+Fig S4C - heatmap for H3K4me1
+
+```{bash}
+Data/chipseq_published/bleckwehl2020/GSM4694551_H3K4me1_mESC_mm39.bw \
+Data/chipseq_published/cruzmolina2017/GSM4694551_H3K4me1_EpiLC_mm39.bw \
+-R ChIPseq_ASCL1_mesconly10k.bed \
+ChIPseq_ASCL1_mescepilc10k.bed \
+ChIPseq_ASCL1_epilconly10k.bed \
+ChIPseq_ASCL1_epilcne10k.bed \
+ChIPseq_ASCL1_neonly10k.bed \
+ChIPseq_ASCL1_mescne10k.bed \
+ChIPseq_ASCL1_universal10k.bed \
+--beforeRegionStartLength 5000 \
+--regionBodyLength 500 \
+--afterRegionStartLength 5000 \
+--missingDataAsZero -o Data/deeptools/matrix/matrix_h3k4me1_allsites.mat.gz
+```
+
+
+
+# FIG 5
+
+Fig 5C - PCA plot for HDACi RNA-seq 
+
+```{r, messages=FALSE}
+
+library(here)
+library(tidyverse)
+library(DESeq2)
+library(cowplot)
+
+
+# plotting a pca plot for the HDACi RNA-seq experiment 
+
+hdacirna <- readRDS(file = here("../Data/RNAseq_HDACi_dds.rds"))
+
+vsd <- vst(hdacirna, blind = FALSE)
+
+colours <- list(
+  "mESC_None_DMSO" = "#AAE4E9", "mESC_Dex_DMSO" = "#4FAAB2", "mESC_None_TSA" = "#AAE4E9", "mESC_Dex_TSA" = "#4FAAB2", 
+  "NE_None_DMSO" = "#FFBCB9", "NE_Dex_DMSO" = "#FF7770", "NE_None_TSA" = "#FFBCB9", "NE_Dex_TSA" = "#FF7770")
+
+
+pcaData.12 <- plotPCA(vsd, intgroup="Group", returnData=TRUE, ntop = 1000)
+percentVar.12 <- round(100 * attr(pcaData.12, "percentVar"))
+pcaplot.12 <- ggplot(pcaData.12, aes(PC1, PC2, color=Group, shape=TSA)) +
+  geom_point(size=4, show.legend = FALSE) +
+  xlab(paste0("PC1: ",percentVar.12[1],"% variance")) +
+  ylab(paste0("PC2: ",percentVar.12[2],"% variance")) + 
+  scale_colour_manual(values = unlist(colours)) + 
+  #coord_fixed() + 
+  theme_cowplot()
+
+ggsave(pcaplot.12, filename = here("../Figures/Fig5B.png"), device = "png", dpi = 300, height = 8, width = 8, units = "cm", bg = "white")
+
+
+# plot pc2 pc3 
+
+pcaData.23 <- plotPCA(vsd, intgroup="Group", returnData=TRUE, ntop = 1000, pcsToUse = 2:3)
+percentVar.23 <- round(100 * attr(pcaData.23, "percentVar"))
+
+pcaplot.23 <- ggplot(pcaData.23, aes(PC2, PC3, color=Group, shape=TSA)) +
+  geom_point(size=4, show.legend = FALSE) +
+  xlab(paste0("PC2: ",percentVar.23[1],"% variance")) +
+  ylab(paste0("PC3: ",percentVar.23[2],"% variance")) + 
+  scale_colour_manual(values = unlist(colours)) + 
+  #coord_fixed() + 
+  theme_cowplot()
+
+ggsave(pcaplot.23, filename = here("../Figures/FigS5B.png"), device = "png", dpi = 300, height = 8, width = 8, units = "cm", bg = "white")
+```
+
+Fig 5D - counts for selected genes in mESC with HDACi
+
+```{r, messages=FALSE}
+library(here)
+library(tidyverse)
+library(ggplot2)
+library(cowplot)
+
+counts <- read.csv(here("../Data/RNAseq_HDACi_normcounts.csv"))
+counts <- counts %>% dplyr::rename(gene_id = X)
+
+# Map Ensembl IDs to gene symbols
+gene_map <- read.csv(here("../Data/RNAseq_GeneMap.csv"), row.names = 1)
+counts <- counts %>%
+  left_join(gene_map %>% dplyr::select(gene_id, symbol), by = "gene_id") %>%
+  dplyr::filter(!is.na(symbol) & symbol != "") %>%
+  dplyr::select(-gene_id) %>%
+  dplyr::relocate(symbol)
+
+
+
+ne.degs <- read.table(here("../Data/ChIPseq_NEboundgenes_208.txt")) %>% pull(x)
+hdaci_mesc_degs <- read.csv(here("../Data/RNAseq_HDACi_DEGs_mESC.csv"), row.names = 1)
+hdaci_mesc_tsatargets <- hdaci_mesc_degs %>% dplyr::filter(ASCL1_target %in% c("tsa", "both"))
+
+counts.nepeaks <- counts %>% dplyr::filter(symbol %in% ne.degs)
+
+mat <- counts.nepeaks %>%
+  dplyr::select(symbol, contains("mESC") | contains("NE")) %>%
+  tibble::column_to_rownames("symbol")
+# Loop through genes of interest
+genes.ofi <- ne.degs # c("Nkx6-1", "Dlx2", "Wnt5a", "Onecut1", "Plxna2", "Map2", "Hes5", "Tha1", "Phox2a", "Hdac11", "Nos1", "Sox10", "Ank2", "Dcx", "Ebf3", "Zbtb18")
+
+hdaci_degs <- read.csv(here("../Data/RNAseq_HDACi_DEGs.csv"))
+
+# define which padj columns map to which x-axis comparison
+padj_map <- list(
+  "mESC_None_DMSO|mESC_Dex_DMSO" = "mESC_ASCL1vsControl_padj",
+  "mESC_None_TSA|mESC_Dex_TSA"   = "mESC_ASCL1withTSA_padj",
+  "NE_None_DMSO|NE_Dex_DMSO"     = "NE_ASCL1vsControl_padj",
+  "NE_None_TSA|NE_Dex_TSA"       = "NE_ASCL1withTSA_padj"
+)
+
+# x positions for each bracket (midpoint between the two conditions)
+bracket_xpos <- c(1.5, 3.5, 5.5, 7.5)
+
+for (gene.ofi in genes.ofi) {
+
+  if (!gene.ofi %in% rownames(mat)) {
+    message("Skipping ", gene.ofi, " - not found in counts matrix")
+    next
+  }
+
+  counts.ofi <- mat[gene.ofi, ]
+
+  df <- tibble::tibble(
+    sample = names(counts.ofi),
+    value  = as.numeric(counts.ofi)
+  ) %>%
+    separate(sample, into = c("exp", "line", "cell", "ASCL1", "TSA", "rep"), sep = "_") %>%
+    mutate(
+      color_group = case_when(
+        cell == "mESC" & ASCL1 == "None" ~ "#AAE4E9",
+        cell == "mESC" & ASCL1 == "Dex"  ~ "#4FAAB2",
+        cell == "NE"   & ASCL1 == "None" ~ "#FFBCBD",
+        cell == "NE"   & ASCL1 == "Dex"  ~ "#FB7D80"
+      ),
+      shape_group = ifelse(TSA == "DMSO", 21, 24),
+      cond = paste(cell, ASCL1, TSA, sep = "_"),
+      cond = factor(cond, levels = c(
+        "mESC_None_DMSO", "mESC_Dex_DMSO", "mESC_None_TSA", "mESC_Dex_TSA",
+        "NE_None_DMSO",   "NE_Dex_DMSO",   "NE_None_TSA",   "NE_Dex_TSA"
+      ))
+    )
+
+  # get padj values for this gene from results table
+  gene_row <- hdaci_degs %>% dplyr::filter(symbol == gene.ofi)
+
+  padj_labels <- imap(padj_map, ~ {
+      padj_val <- gene_row[[.x]]
+      if (length(padj_val) == 0 || is.na(padj_val)) {
+          return(tibble(comparison = .y, padj = NA, label = "ns"))
+      }
+      label <- case_when(
+          padj_val < 0.001 ~ "***",
+          padj_val < 0.01  ~ "**",
+          padj_val < 0.05  ~ "*",
+          TRUE             ~ "ns"
+      )
+      tibble(comparison = .y, padj = padj_val, label = label)
+  }) %>% bind_rows()
+
+  # set bracket height just above max value
+  y_max    <- max(df$value, na.rm = TRUE)
+  y_step   <- y_max * 0.08
+  y_bracket <- y_max + y_step
+
+  p <- ggplot(df, aes(x = cond, y = value)) +
+    geom_boxplot(aes(fill = color_group), width = 0.7, outlier.shape = NA, color = "black", size = 0.3) +
+    geom_point(aes(fill = color_group, shape = factor(shape_group)),
+               position = position_jitter(width = 0.1, height = 0),
+               size = 3, color = "black") +
+    scale_fill_identity() +
+    scale_shape_manual(values = c("21" = 21, "24" = 24)) +
+    geom_vline(xintercept = 4.5, linetype = "dashed", colour = "grey40", linewidth = 0.4) +
+    # add brackets and labels
+    geom_segment(data = tibble(x = bracket_xpos - 0.4, xend = bracket_xpos + 0.4,
+                               y = y_bracket, yend = y_bracket),
+                 aes(x = x, xend = xend, y = y, yend = yend),
+                 inherit.aes = FALSE, linewidth = 0.4) +
+    annotate("text",
+             x = bracket_xpos,
+             y = y_bracket + y_step * 1.2,
+             label = padj_labels$label,
+             size = 7) +
+    ylab("") +
+    xlab("") +
+    theme_cowplot() +
+    theme(
+      legend.position = "none",
+      axis.line = element_line(linewidth = 0.4),
+      axis.text.x = element_blank(),
+      axis.text.y = element_text(size = 14),
+      axis.title.y = element_blank(),
+      plot.title = element_text(size = 16, face = "italic", hjust = 0.5)
+    ) +
+    labs(title = gene.ofi)
+
+  ggsave(
+    filename = here("../Examples_HDACi/", paste0("Fig5D_", gene.ofi, ".png")),
+    plot = p,
+    width = 3, height = 4, units = "in", dpi = 300, bg = "white"
+  )
+}
+
+```
+
+Fig 5E - heatmap for genes that are upregulated by ascl1 relative to tsa baseline 
+
+```{r}
+
+library(ComplexHeatmap)
+library(circlize)
+library(here)
+library(tidyverse)
+
+counts <- read.csv(here("../Data/RNAseq_HDACi_normcounts.csv"))
+counts <- counts %>% dplyr::rename(gene_id = X)
+
+gene_map <- read.csv(here("../Data/RNAseq_GeneMap.csv"), row.names = 1)
+counts <- counts %>%
+  left_join(gene_map %>% dplyr::select(gene_id, symbol), by = "gene_id") %>%
+  dplyr::filter(!is.na(symbol) & symbol != "") %>%
+  dplyr::select(-gene_id) %>%
+  dplyr::relocate(symbol) %>%
+  group_by(symbol) %>%
+  slice_max(order_by = rowMeans(across(where(is.numeric))), n = 1) %>%
+  ungroup()
+
+# ── Filter genes ──────────────────────────────────────────────────────────────
+hdaci_degs <- read.csv(here("../Data/RNAseq_HDACi_DEGs.csv"))
+
+genes_of_interest <- hdaci_degs %>%
+  dplyr::filter(
+    (mESC_ASCL1withTSA_padj < 0.01 & mESC_ASCL1withTSA_LFC > 0)
+  ) %>%
+  pull(symbol) %>%
+  unique()
+
+
+# ── Prepare matrix ────────────────────────────────────────────────────────────
+mat_heatmap <- counts %>%
+  dplyr::filter(symbol %in% genes_of_interest) %>%
+  dplyr::select(symbol, contains("mESC")) %>%
+  tibble::column_to_rownames("symbol")
+
+# handle duplicate symbols if present
+if (any(duplicated(rownames(mat_heatmap)))) {
+  mat_heatmap <- mat_heatmap %>%
+    rownames_to_column("symbol") %>%
+    group_by(symbol) %>%
+    slice_max(order_by = rowMeans(across(where(is.numeric))), n = 1) %>%
+    ungroup() %>%
+    column_to_rownames("symbol")
+}
+
+# z-score by row
+mat_z <- t(scale(t(mat_heatmap)))
+
+# ── Column annotation ─────────────────────────────────────────────────────────
+col_meta <- tibble(sample = colnames(mat_z)) %>%
+  separate(sample, into = c("exp", "line", "cell", "ASCL1", "TSA", "rep"), sep = "_") %>%
+  mutate(
+    condition = paste(ASCL1, TSA, sep = "_"),
+    condition = factor(condition, levels = c("None_DMSO", "Dex_DMSO", "None_TSA", "Dex_TSA"))
+  )
+
+col_ann <- HeatmapAnnotation(
+  ASCL1 = col_meta$ASCL1,
+  TSA   = col_meta$TSA,
+  col   = list(
+    ASCL1 = c("None" = "#AAE4E9", "Dex"  = "#4FAAB2"),
+    TSA   = c("DMSO" = "#D3D3D3", "TSA"  = "#404040")
+  ),
+  annotation_name_side = "left"
+)
+
+# ── Row annotation for NE-bound genes ────────────────────────────────────────
+ne.degs <- read.table(here("../Data/ChIPseq_NEboundgenes_208.txt")) %>% pull(x)
+
+ne_bound <- rownames(mat_z) %in% ne.degs
+
+row_ann <- rowAnnotation(
+  NE_bound = anno_mark(
+    at        = which(ne_bound),
+    labels    = rownames(mat_z)[ne_bound],
+    labels_gp = gpar(fontsize = 16, fontface = "italic")
+  )
+)
+
+# ── Draw heatmap ──────────────────────────────────────────────────────────────
+ht <- Heatmap(
+  mat_z,
+  name              = "z-score",
+  col = met.brewer("OKeeffe1", direction = -1),
+  top_annotation    = col_ann,
+  # right_annotation  = row_ann,
+  column_order      = col_order,
+  cluster_columns   = FALSE,
+  cluster_rows      = TRUE,
+  show_row_names    = FALSE,
+  show_column_names = FALSE,
+  row_title         = paste0(length(genes_of_interest), " genes"),
+  column_title      = "mESC",
+  border            = TRUE
+)
+
+draw(ht)
+
+png(here("../Figures/Fig_HDACi_Heatmap_mESC_TSAtargets.png"),
+    width = 5, height = 7, units = "in", res = 300, bg = "white")
+draw(ht)
+dev.off()
+
+```
+
+Fig 5F - different heatmap to show genes that are originally NE specific but are now upregulated in mESC ascl1+tsa versus control
+
+```{r}
+
+library(ComplexHeatmap)
+library(circlize)
+library(here)
+library(tidyverse)
+library(MetBrewer)
+
+counts <- read.csv(here("../Data/RNAseq_HDACi_normcounts.csv"))
+counts <- counts %>% dplyr::rename(gene_id = X)
+
+gene_map <- read.csv(here("../Data/RNAseq_GeneMap.csv"), row.names = 1)
+counts <- counts %>%
+  left_join(gene_map %>% dplyr::select(gene_id, symbol), by = "gene_id") %>%
+  dplyr::filter(!is.na(symbol) & symbol != "") %>%
+  dplyr::select(-gene_id) %>%
+  dplyr::relocate(symbol) %>%
+  group_by(symbol) %>%
+  slice_max(order_by = rowMeans(across(where(is.numeric))), n = 1) %>%
+  ungroup()
+
+# ── Load gene lists ───────────────────────────────────────────────────────────
+hdaci_degs <- read.csv(here("../Data/RNAseq_HDACi_DEGs.csv"))
+ne.degs <- read.table(here("../Data/ChIPseq_NEboundgenes_208.txt")) %>% pull(x)
+
+# genes significantly upregulated in ASCL1+TSA vs Control
+ascl1tsa_up <- hdaci_degs %>%
+  dplyr::filter(mESC_ASCL1withTSAvsControl_padj < 0.01 & mESC_ASCL1withTSAvsControl_LFC > 0) %>%
+  pull(symbol)
+
+# ── Prepare matrix for all ne.degs genes ─────────────────────────────────────
+mat_heatmap <- counts %>%
+  dplyr::filter(symbol %in% ne.degs) %>%
+  dplyr::select(symbol, contains("mESC")) %>%
+  tibble::column_to_rownames("symbol")
+
+# z-score by row
+mat_z <- t(scale(t(mat_heatmap)))
+
+# ── Column annotation ─────────────────────────────────────────────────────────
+col_meta <- tibble(sample = colnames(mat_z)) %>%
+  separate(sample, into = c("exp", "line", "cell", "ASCL1", "TSA", "rep"), sep = "_") %>%
+  mutate(
+    condition = paste(ASCL1, TSA, sep = "_"),
+    condition = factor(condition, levels = c("None_DMSO", "Dex_DMSO", "None_TSA", "Dex_TSA"))
+  )
+
+col_ann <- HeatmapAnnotation(
+  ASCL1 = col_meta$ASCL1,
+  TSA   = col_meta$TSA,
+  col   = list(
+    ASCL1 = c("None" = "#AAE4E9", "Dex" = "#4FAAB2"),
+    TSA   = c("DMSO" = "#D3D3D3", "TSA" = "#404040")
+  ),
+  annotation_name_side = "left"
+)
+
+# ── Column order ──────────────────────────────────────────────────────────────
+col_order <- order(col_meta$condition)
+
+# ── Row annotation: label genes upregulated in ASCL1+TSA vs TSA alone ────────
+ascl1tsa_vs_tsa_up <- hdaci_degs %>%
+  dplyr::filter(mESC_ASCL1withTSA_padj < 0.01 & mESC_ASCL1withTSA_LFC > 0) %>%
+  pull(symbol)
+
+sig_up <- rownames(mat_z) %in% ascl1tsa_vs_tsa_up
+
+row_ann <- rowAnnotation(
+  ASCL1_TSA_up = anno_mark(
+    at        = which(sig_up),
+    labels    = rownames(mat_z)[sig_up],
+    labels_gp = gpar(fontsize = 18, fontface = "italic")
+  )
+)
+
+# ── Draw heatmap ──────────────────────────────────────────────────────────────
+ht <- Heatmap(
+  mat_z,
+  name              = "z-score",
+  col               = met.brewer("OKeeffe1", direction = -1),
+  top_annotation    = col_ann,
+  right_annotation  = row_ann,
+  column_order      = col_order,
+  cluster_columns   = FALSE,
+  cluster_rows      = TRUE,
+  show_row_names    = FALSE,
+  show_column_names = FALSE,
+  row_title         = paste0(nrow(mat_z), " NE-bound genes"),
+  column_title      = "mESC",
+  border            = TRUE,
+  km = 2
+)
+
+png(here("../Figures/Fig_HDACi_Heatmap_mESC_NEbound.png"),
+    width = 7, height = 8, units = "in", res = 300, bg = "white")
+draw(ht)
+dev.off()
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+n_total        <- nrow(mat_z)
+n_ascl1tsa_vs_control <- sum(rownames(mat_z) %in% (hdaci_degs %>%
+  dplyr::filter(mESC_ASCL1withTSAvsControl_padj < 0.01 & mESC_ASCL1withTSAvsControl_LFC > 0) %>%
+  pull(symbol)))
+n_tsa_alone    <- sum(rownames(mat_z) %in% (hdaci_degs %>%
+  dplyr::filter(mESC_TSA_alone_padj < 0.01 & mESC_TSA_alone_LFC > 0) %>%
+  pull(symbol)))
+n_ascl1tsa_vs_tsa <- sum(sig_up)
+
+message(
+  "Of ", n_total, " NE-bound genes in the heatmap:\n",
+  "  - ", n_ascl1tsa_vs_control, " upregulated in ASCL1+TSA vs Control\n",
+  "  - ", n_tsa_alone,           " upregulated in TSA alone vs Control\n",
+  "  - ", n_ascl1tsa_vs_tsa,     " upregulated in ASCL1+TSA vs TSA alone (labelled)"
+)
+
+```
+
+Fig 5F' - GO analysis for DEGs with and without TSA
+
+```{r, messages=FALSE}
+library(here)
+library(tidyverse)
+library(clusterProfiler)
+library(org.Mm.eg.db)
+library(MetBrewer)
+library(cowplot)
+
+# ── GO analysis on TSA-sensitive ASCL1 targets (ns in DMSO, up in TSA) ───────
+go_result <- enrichGO(
+  gene          = genes_of_interest,
+  OrgDb         = org.Mm.eg.db,
+  keyType       = "SYMBOL",
+  ont           = "BP",
+  pAdjustMethod = "BH",
+  pvalueCutoff  = 0.05,
+  qvalueCutoff  = 0.2
+)
+
+go_simplified <- simplify(go_result)
+
+p_go <- barplot(go_simplified, showCategory = 6) +
+  theme_cowplot() +
+  scale_y_discrete(labels = function(x) str_wrap(x, width = 25)) +
+  scale_fill_gradient(high = "#e86f35", low = "#ffb945")
+
+png(filename = here("../Figures/Fig_HDACi_GO_mESC_TSAsensitive.png"),
+    width = 12, height = 12, units = "cm", res = 300, bg = "white")
+p_go
+dev.off()
+```
+
+
+# FIG S5 
+
+Fig S5C-F - volcano plots for all comaprisons in supplementary and synergy comparison in mesc 
+
+```{r}
+library(ggplot2)
+library(patchwork)
+library(dplyr)
+library(here)
+
+hdaci_degs <- read.csv(file = here("../Data/RNAseq_HDACi_DEGs.csv"))
+
+make_volcano <- function(data, lfc_col, padj_col, title,
+                         lfc_thresh = 0, padj_thresh = 0.01,
+                         up_colour = "#79c1d1") {
+  df <- data %>%
+    transmute(
+      symbol        = symbol,
+      LFC           = .data[[lfc_col]],
+      padj          = .data[[padj_col]],
+      neglog10_padj = -log10(padj),
+      sig = case_when(
+        padj < padj_thresh & LFC >  lfc_thresh ~ "up",
+        padj < padj_thresh & LFC < -lfc_thresh ~ "down",
+        TRUE                                   ~ "ns"
+      ),
+      sig = factor(sig, levels = c("ns", "down", "up"))
+    )
+
+  n_up   <- sum(df$sig == "up")
+  n_down <- sum(df$sig == "down")
+
+  ggplot(df, aes(x = LFC, y = neglog10_padj, colour = sig)) +
+    geom_point(size = 1, alpha = 0.5) +
+    annotate("text",
+             x = Inf, y = Inf,
+             hjust = 1.1, vjust = 1.5,
+             label = paste0("Up: ", n_up),
+             colour = up_colour, size = 3.5, fontface = "bold") +
+    annotate("text",
+             x = -Inf, y = Inf,
+             hjust = -0.1, vjust = 1.5,
+             label = paste0("Down: ", n_down),
+             colour = "#404040", size = 3.5, fontface = "bold") +
+    scale_colour_manual(
+      values = c(up = up_colour, down = "#404040", ns = "#D3D3D3"),
+      labels = c(up = "Up", down = "Down", ns = "NS")
+    ) +
+    geom_vline(xintercept = c(-lfc_thresh, lfc_thresh),
+               linetype = "dashed", colour = "grey40", linewidth = 0.4) +
+    geom_hline(yintercept = -log10(padj_thresh),
+               linetype = "dashed", colour = "grey40", linewidth = 0.4) +
+    labs(
+      title  = title,
+      x      = "ashr Log2 Fold Change",
+      y      = expression(-log[10](p[adj])),
+      colour = NULL
+    ) +
+    theme_classic(base_size = 11) +
+    scale_y_continuous(limits = c(0, 30)) +
+    scale_x_continuous(limits = c(-8, 8)) +
+    theme(
+      plot.title      = element_text(hjust = 0.5, face = "bold"),
+      legend.position = "bottom"
+    )
+}
+
+# ── mESC ──────────────────────────────────────────────────────────────────────
+mESC_p1 <- make_volcano(hdaci_degs, "mESC_ASCL1vsControl_ashrLFC",        "mESC_ASCL1vsControl_padj",        "ASCL1 vs Control",       up_colour = "#4FAAB2")
+mESC_p2 <- make_volcano(hdaci_degs, "mESC_TSA_alone_ashrLFC",             "mESC_TSA_alone_padj",             "TSA only",               up_colour = "#4FAAB2")
+mESC_p3 <- make_volcano(hdaci_degs, "mESC_ASCL1withTSAvsControl_ashrLFC", "mESC_ASCL1withTSAvsControl_padj", "ASCL1 + TSA vs Control", up_colour = "#4FAAB2")
+mESC_p4 <- make_volcano(hdaci_degs, "mESC_ASCL1withTSA_ashrLFC",          "mESC_ASCL1withTSA_padj",          "ASCL1 with TSA",         up_colour = "#4FAAB2")
+
+mESC_full <- mESC_p1 + mESC_p2 + mESC_p3 + mESC_p4 +
+  plot_layout(ncol = 4, guides = "collect") +
+  plot_annotation(title = "mESC") &
+  theme(legend.position = "bottom")
+
+ggsave(mESC_full, filename = here("../Figures/Fig_HDACi_RNAseq_mESC_new.png"), width = 12, height = 4, dpi = 300)
+
+# ── NE ────────────────────────────────────────────────────────────────────────
+NE_p1 <- make_volcano(hdaci_degs, "NE_ASCL1vsControl_ashrLFC",        "NE_ASCL1vsControl_padj",        "ASCL1 vs Control",       up_colour = "#FB7D80")
+NE_p2 <- make_volcano(hdaci_degs, "NE_TSA_alone_ashrLFC",             "NE_TSA_alone_padj",             "TSA only",               up_colour = "#FB7D80")
+NE_p3 <- make_volcano(hdaci_degs, "NE_ASCL1withTSAvsControl_ashrLFC", "NE_ASCL1withTSAvsControl_padj", "ASCL1 + TSA vs Control", up_colour = "#FB7D80")
+NE_p4 <- make_volcano(hdaci_degs, "NE_ASCL1withTSA_ashrLFC",          "NE_ASCL1withTSA_padj",          "ASCL1 with TSA",         up_colour = "#FB7D80")
+
+NE_full <- NE_p1 + NE_p2 + NE_p3 + NE_p4 +
+  plot_layout(ncol = 4, guides = "collect") +
+  plot_annotation(title = "NE") &
+  theme(legend.position = "bottom")
+
+ggsave(NE_full, filename = here("../Figures/Fig_HDACi_RNAseq_NE_new.png"), width = 12, height = 4, dpi = 300)
+
+# ── mESC synergy ──────────────────────────────────────────────────────────────
+mESC_synergy <- make_volcano(hdaci_degs, "mESC_synergy_ashrLFC", "mESC_synergy_padj", "mESC Synergy", up_colour = "#4FAAB2")
+
+ggsave(mESC_synergy, filename = here("../Figures/Fig_HDACi_RNAseq_mESC_synergy_new.png"), width = 4, height = 4, dpi = 300)
+
+# ── NE synergy ────────────────────────────────────────────────────────────────
+NE_synergy <- make_volcano(hdaci_degs, "NE_synergy_ashrLFC", "NE_synergy_padj", "NE Synergy", up_colour = "#FB7D80")
+
+ggsave(NE_synergy, filename = here("../Figures/Fig_HDACi_RNAseq_NE_synergy_new.png"), width = 4, height = 4, dpi = 300)
+
+```
+
+
+# FIG 6
+
+Fig 6A - cofactor motif versus expression for NE 
+
+```{r, messages=FALSE}
+library(here)
+library(tidyverse)
+library(AnnotationHub)
+library(DESeq2)
+library(ggrepel)
+
+# Load and clean HOMER motif results
+homer.ne <- read.delim(
+  here("../Data/homer/ne_specific/knownResults.txt"),
+  header = TRUE,
+  comment.char = "",
+  quote = ""
+) %>%
+  extract(
+    Motif.Name,
+    into = c("TF", "family"),
+    regex = "^([^\\(]+)\\(([^\\)]+)\\)",
+    remove = FALSE
+  ) %>%
+  mutate(
+    target_pct      = as.numeric(str_remove(X..of.Target.Sequences.with.Motif, "%")),
+    background_pct  = as.numeric(str_remove(X..of.Background.Sequences.with.Motif, "%")),
+    fold_enrichment = target_pct / background_pct,
+    logPvalue       = -log2(P.value),
+    TF_family_clean = TF %>%
+      str_replace_all("\\.", "-") %>%
+      str_to_sentence()
+  ) %>%
+  dplyr::select(
+    TF_family_clean,
+    TF,
+    family,
+    Consensus,
+    P.value,
+    target_pct,
+    background_pct,
+    fold_enrichment,
+    logPvalue
+  )
+
+# Load reference TF list
+
+tfs <- read.csv(here("../Data/Ref_MouseTFs.csv"))
+
+homeoboxes <- tfs %>%
+  dplyr::filter(Family == "Homeobox") %>%
+  dplyr::pull(Gene.Symbol)
+
+tfs.clean <- tfs %>%
+  dplyr::pull(Gene.Symbol)
+
+# Load DESeq2 object and map Ensembl IDs to symbols
+dds <- readRDS(here("../Data/RNAseq_ASCL1_dds.Rds"))
+
+ah <- AnnotationHub()
+EnsDb <- ah[["AH109367"]]
+
+gene_map <- genes(EnsDb, return.type = "DataFrame") %>%
+  as.data.frame() %>%
+  dplyr::select(gene_id, symbol)
+
+gene_symbols <- gene_map$symbol[match(rownames(dds), gene_map$gene_id)]
+dds <- dds[!is.na(gene_symbols) & gene_symbols != "", ]
+rownames(dds) <- gene_symbols[!is.na(gene_symbols) & gene_symbols != ""]
+
+# Differential expression: mESC vs NE
+res <- results(
+  dds,
+  contrast = c("Group", "gG5_NE_t0", "gG5_mESC_t0"),
+  alpha = 0.01,
+  lfcThreshold = 0.585
+)
+
+lfc <- lfcShrink(dds, res = res, type = "ashr")
+
+sig.tfs <- cbind(
+  as.data.frame(res),
+  ashrLFC = lfc$log2FoldChange,
+  ashrSE  = lfc$lfcSE,
+  symbol  = rownames(res)
+) %>%
+  dplyr::filter(
+    symbol %in% tfs.clean,
+    log2FoldChange > 0,
+    padj < 0.01
+  )
+
+# Merge motif enrichment with TF expression
+final.tbl <- homer.ne %>%
+  inner_join(sig.tfs, by = c("TF_family_clean" = "symbol")) %>%
+  mutate(
+    motif_class = case_when(
+      family == "HMG"       ~ "HMG",
+      family == "Homeobox" ~ "Homeobox",
+      family == "bHLH" ~ "bHLH",
+      TRUE                 ~ "Other"
+    )
+  )
+
+final.tbl <- final.tbl %>%
+  mutate(
+    label_tf = ifelse(
+      padj < 0.05 & P.value < 0.05,
+      TF_family_clean,
+      NA_character_
+    )
+  )
+
+# Plot: Motif enrichment vs TF expression
+plot <- ggplot(final.tbl, aes(x = fold_enrichment, y = ashrLFC)) +
+  geom_point(
+    aes(color = motif_class),
+    size = 3,
+    alpha = 0.8
+  ) +
+  scale_color_manual(
+    values = c(
+      HMG = "orange",
+      Homeobox = "magenta",
+      bHLH = "lightblue",
+      Other = "grey70"
+    )
+  ) +
+  geom_text_repel(
+    aes(label = label_tf),
+    size = 5,
+    max.overlaps = 20,
+    box.padding = 0.5
+  ) +
+  labs(
+    x = "Motif fold enrichment (NE vs background)",
+    y = "RNA-seq log2 fold change (NE vs mESC)",
+    color = "Motif family"
+  ) +
+  theme_classic()
+
+plot
+
+ggsave(filename = here("../Figures/Fig6A.png"), width = 5, height = 5, bg = "white", dpi = 300)
+
+```
+
+
+# FIG S6
+
+Fig S6A - cofactor motif versus expression for mESC 
+
+```{r, messages=FALSE}
+library(here)
+library(tidyverse)
+library(AnnotationHub)
+library(DESeq2)
+library(ggrepel)
+
+# -----------------------------
+# Load and clean HOMER motif results (mESC-specific)
+# -----------------------------
+homer.mesc <- read.delim(
+  here("../Data/homer/mesc_specific/knownResults.txt"),
+  header = TRUE,
+  comment.char = "",
+  quote = ""
+) %>%
+  extract(
+    Motif.Name,
+    into = c("TF", "family"),
+    regex = "^([^\\(]+)\\(([^\\)]+)\\)",
+    remove = FALSE
+  ) %>%
+  mutate(
+    target_pct      = as.numeric(str_remove(X..of.Target.Sequences.with.Motif, "%")),
+    background_pct  = as.numeric(str_remove(X..of.Background.Sequences.with.Motif, "%")),
+    fold_enrichment = target_pct / background_pct,
+    logPvalue       = -log2(P.value),
+    TF_family_clean = TF %>%
+      str_replace_all("\\.", "-") %>%
+      str_to_sentence(),
+    TF_family_clean = dplyr::case_when(
+      TF_family_clean == "Ap-2alpha" ~ "Tfap2a",
+      TF_family_clean == "Ap-2gamma" ~ "Tfap2c",
+      TRUE                           ~ TF_family_clean
+    )
+  ) %>%
+  dplyr::select(
+    TF_family_clean,
+    TF,
+    family,
+    Consensus,
+    P.value,
+    target_pct,
+    background_pct,
+    fold_enrichment,
+    logPvalue
+  )
+
+# -----------------------------
+# Load reference TF list
+# -----------------------------
+tfs <- read.csv(here("../Data/Ref_MouseTFs.csv"))
+
+tfs.clean <- tfs %>%
+  dplyr::pull(Gene.Symbol)
+
+# -----------------------------
+# Load DESeq2 object and map Ensembl IDs to symbols
+# -----------------------------
+dds <- readRDS(here("../Data/RNAseq_ASCL1_dds.Rds"))
+
+ah <- AnnotationHub()
+EnsDb <- ah[["AH109367"]]
+
+gene_map <- genes(EnsDb, return.type = "DataFrame") %>%
+  as.data.frame() %>%
+  dplyr::select(gene_id, symbol)
+
+gene_symbols <- gene_map$symbol[match(rownames(dds), gene_map$gene_id)]
+dds <- dds[!is.na(gene_symbols) & gene_symbols != "", ]
+rownames(dds) <- gene_symbols[!is.na(gene_symbols) & gene_symbols != ""]
+
+# -----------------------------
+# Differential expression: mESC vs NE
+# (negative LFC = higher in mESC)
+# -----------------------------
+res <- results(
+  dds,
+  contrast = c("Group", "gG5_NE_t0", "gG5_mESC_t0"),
+  alpha = 0.01,
+  lfcThreshold = 0.585
+)
+
+lfc <- lfcShrink(dds, res = res, type = "ashr")
+
+sig.tfs.mesc <- cbind(
+  as.data.frame(res),
+  ashrLFC = lfc$log2FoldChange,
+  ashrSE  = lfc$lfcSE,
+  symbol  = rownames(res)
+) %>%
+  dplyr::filter(
+    symbol %in% tfs.clean,
+    ashrLFC < 0,
+    padj < 0.01
+  )
+
+# -----------------------------
+# Merge motif enrichment with TF expression
+# -----------------------------
+final.tbl.mesc <- homer.mesc %>%
+  inner_join(sig.tfs.mesc, by = c("TF_family_clean" = "symbol")) %>%
+  mutate(
+    motif_class = case_when(
+      family == "AP2"       ~ "AP2",
+      family == "NR" ~ "NR",
+      family == "Zf"     ~ "Zf",
+      family == "Homeobox"     ~ "Homeobox",
+      TRUE                 ~ "Other"
+    ),
+    label_tf = ifelse(
+      padj < 0.05 & P.value < 0.05,
+      TF_family_clean,
+      NA_character_
+    )
+  )
+
+# -----------------------------
+# Plot: Motif enrichment vs TF expression (mESC)
+# -----------------------------
+plot <- ggplot(final.tbl.mesc, aes(x = fold_enrichment, y = -ashrLFC)) +
+  geom_point(
+    aes(color = motif_class),
+    size = 3,
+    alpha = 0.8
+  ) +
+  scale_color_manual(
+    values = c(
+      AP2 = "green",
+      Homeobox = "magenta",
+      NR = "yellow",
+      Zf = "cyan",
+      Other = "grey70"
+    )
+  ) +
+  geom_text_repel(
+    aes(label = label_tf),
+    size = 5,
+    max.overlaps = 20,
+    box.padding = 0.5,
+    na.rm = TRUE
+  ) +
+  labs(
+    x = "Motif fold enrichment (mESC vs background)",
+    y = "RNA-seq log2 fold change (NE vs mESC)",
+    color = "Motif family"
+  ) +
+  theme_classic()
+
+ggsave(
+  filename = here("../Figures/FigS6A.png"),
+  plot = plot,
+  width = 6,
+  height = 5,
+  bg = "white",
+  dpi = 300
+)
+
+plot
+
+```
+
+
+# FIG 7
+
+Fig 7A-A'' - heatmap for all degs in mesc with ascl1 and phox2b 
+
+```{r}
+library(here)
+library(tidyverse)
+library(ComplexHeatmap)
+library(clusterProfiler)
+library(org.Mm.eg.db)
+library(cowplot)
+library(MetBrewer)
+
+# which degs to look at? all ascl1 + phox2b genes 
+
+phox2b_degs <- read.table(file = here("../Data/RNAseq_Cofactor_Phox2b_DEGs.csv"), sep = ",", header = TRUE)
+
+phox2bascl1mescgenes <- phox2b_degs %>% dplyr::filter(mESC_Combo_change == "up" & mESC_Combo_LFC > 1) %>% pull(symbol) %>% unique() # 757 genes in this list, which matches the volcano 
+
+# ── Data loading ──────────────────────────────────────────────────────────────
+counts.phox2b <- read.table(
+  file = here("../Data/RNAseq_Cofactors_Phox2b_normcounts.csv"),
+  sep = ",", header = TRUE
+) %>% dplyr::rename(symbol = X)
+
+
+# ── Filter to upregulated genes from combined condition ─────────────────────────────────────
+
+counts.phox2bdegs <- counts.phox2b %>%
+  dplyr::filter(symbol %in% phox2bascl1mescgenes)
+
+counts.phox2bdegs.clean <- counts.phox2bdegs %>%
+  dplyr::filter(symbol != "" & !is.na(symbol)) %>%
+  distinct(symbol, .keep_all = TRUE)
+
+# ── Build z-scored expression matrix ─────────────────────────────────────────
+
+expr_mat <- counts.phox2bdegs.clean %>%
+  dplyr::select(symbol, contains("mESC")) %>%
+  column_to_rownames("symbol") %>%
+  as.matrix()
+expr_z <- t(scale(t(expr_mat)))
+
+
+# ── Cluster rows BEFORE heatmap (set seed for reproducibility) ───────────────
+set.seed(42)
+km_result           <- kmeans(expr_z, centers = 2, nstart = 25)
+cluster_assignments <- km_result$cluster
+
+cluster1_genes <- names(cluster_assignments[cluster_assignments == 1])
+cluster2_genes <- names(cluster_assignments[cluster_assignments == 2])
+#cluster3_genes <- names(cluster_assignments[cluster_assignments == 3])
+#cluster2and3_genes <- c(cluster2_genes, cluster3_genes)
+# etc. 
+
+# ── Row split factor ──────────────────────────────────────────────────────────
+row_split <- factor(paste0("C", cluster_assignments), levels = paste0("C", 1:2))
+
+# # ── Right annotation: gene labels ────────────────────────────────────────────
+# label_genes <- head(genes_of_interest, 10)
+# row_labels  <- rownames(expr_z_withNE)
+# 
+# ha_right <- rowAnnotation(
+#   link = anno_mark(
+#     at        = which(row_labels %in% label_genes),
+#     labels    = row_labels[which(row_labels %in% label_genes)],
+#     labels_gp = gpar(fontsize = 8),
+#     padding   = unit(1, "mm")
+#   )
+# )
+
+
+# ── Heatmap ───────────────────────────────────────────────────────────────────
+hm <- Heatmap(
+  expr_z,
+  name               = "Z-score",
+  show_row_names     = FALSE,
+  show_column_names  = FALSE,
+  cluster_rows       = TRUE,
+  cluster_columns    = FALSE,
+  row_split          = row_split,
+  cluster_row_slices = FALSE,
+  row_title          = "Phox2b-associated genes",
+  column_title       = "Samples",
+  col = met.brewer("OKeeffe1", direction = -1)
+)
+
+draw(hm)
+
+png(
+  filename = here("../Figures/Fig7A.png"),
+  width = 9, height = 24, units = "cm", bg = "white", res = 300
+)
+draw(hm)
+dev.off()
+
+
+
+# ── GO analysis on target cluster genes ──────────────────────────────────────
+go_result_1 <- enrichGO(
+  gene          = cluster1_genes,
+  OrgDb         = org.Mm.eg.db,
+  keyType       = "SYMBOL",
+  ont           = "BP",
+  pAdjustMethod = "BH",
+  pvalueCutoff  = 0.05,
+  qvalueCutoff  = 0.05,
+  readable      = TRUE
+)
+
+go_result_2 <- enrichGO(
+  gene          = cluster2_genes,
+  OrgDb         = org.Mm.eg.db,
+  keyType       = "SYMBOL",
+  ont           = "BP",
+  pAdjustMethod = "BH",
+  pvalueCutoff  = 0.05,
+  qvalueCutoff  = 0.05,
+  readable      = TRUE
+)
+
+
+# ── Simplify and plot GO results for each cluster ─────────────────────────────
+tam_cols <- MetBrewer::met.brewer("Tam", direction = -1)
+
+plot_go <- function(go_result, cluster_label, fig_filename, csv_filename) {
+  if (!is.null(go_result) && nrow(as.data.frame(go_result)) > 0) {
+    
+    go_simplified <- clusterProfiler::simplify(go_result, cutoff = 0.7)
+    go_df         <- as.data.frame(go_simplified)
+    print(head(go_df))
+    
+    write.csv(go_df, file = here(paste0("../Data/", csv_filename, ".csv")), row.names = FALSE)
+    
+    p <- dotplot(go_simplified, showCategory = 6) +
+      scale_fill_gradientn(colours = tam_cols) +
+      scale_y_discrete(labels = function(x) str_wrap(x, width = 45)) +
+      ggtitle(paste0("GO:BP — Cluster ", cluster_label)) +
+      theme_cowplot()
+    
+    print(p)
+    
+    ggsave(
+      filename = here(paste0("../Figures/", fig_filename, ".png")),
+      plot     = p,
+      width    = 15,
+      height   = 9,
+      units    = "cm",
+      dpi      = 300,
+      bg       = "white"
+    )
+    
+  } else {
+    cat("No significant GO terms found for Cluster", cluster_label, "\n")
+  }
+}
+
+plot_go(go_result_1, "1", "Fig7A_GO_C1", "cluster1_GO")
+plot_go(go_result_2, "2", "Fig7A_GO_C2", "cluster2_GO")
+# plot_go(go_result_3, "3", "Fig7A_GO_C3", "cluster3_GO")
+# plot_go(go_result_2and3, "2and3", "Fig7A_GO_C23", "cluster2and3_GO")
+
+# ── Save gene lists ───────────────────────────────────────────────────────────
+write.csv(data.frame(symbol = cluster1_genes), file = here("../Data/cluster1_genes.csv"), row.names = FALSE)
+write.csv(data.frame(symbol = cluster2_genes), file = here("../Data/cluster2_genes.csv"), row.names = FALSE)
+#write.csv(data.frame(symbol = cluster3_genes), file = here("../Data/cluster3_genes.csv"), row.names = FALSE)
+```
+
+Fig 7B-B' - previously identified mESC specific genes incl. cluster that go down with phox2b 
+
+```{r}
+library(here)
+library(tidyverse)
+library(ComplexHeatmap)
+library(clusterProfiler)
+library(org.Mm.eg.db)
+library(MetBrewer)
+library(cowplot)
+
+# ── Data loading ──────────────────────────────────────────────────────────────
+counts.phox2b <- read.table(
+  file = here("../Data/RNAseq_Cofactors_Phox2b_normcounts.csv"),
+  sep = ",", header = TRUE
+) %>% dplyr::rename(symbol = X)
+
+degs <- read.csv(file = here("../Data/RNAseq_ASCL1_DEGs.csv"))
+
+# ── Filter to mESC-only upregulated genes ────────────────────────────────────
+mesconly <- degs %>%
+  dplyr::filter(
+    NE_t24_gg5_change    == "ns",
+    EpiLC_t24_gg5_change == "ns",
+    mESC_t24_gg5_change  == "up"
+  ) %>%
+  pull(symbol) %>%
+  unique()
+
+counts.phox2bmescgenes <- counts.phox2b %>%
+  dplyr::filter(symbol %in% mesconly)
+
+counts.phox2bdegs.clean <- counts.phox2bmescgenes %>%
+  dplyr::filter(symbol != "" & !is.na(symbol)) %>%
+  distinct(symbol, .keep_all = TRUE)
+
+# ── Build z-scored expression matrix ─────────────────────────────────────────
+expr_mat <- counts.phox2bdegs.clean %>%
+  dplyr::select(symbol, contains("mESC")) %>%
+  column_to_rownames("symbol") %>%
+  as.matrix()
+
+expr_z <- t(scale(t(expr_mat)))
+
+# ── Cluster rows BEFORE heatmap (set seed for reproducibility) ───────────────
+set.seed(42)
+km_result <- kmeans(expr_z, centers = 3, nstart = 25)
+cluster_assignments <- km_result$cluster
+
+
+# ── Identify column groups ────────────────────────────────────────────────────
+col_names <- colnames(expr_z)
+
+ascl1_alone_cols  <- col_names[grepl("Ascl1_NoDox", col_names)]
+phox2b_ascl1_cols <- col_names[grepl("Ascl1_Dox",   col_names)]
+
+cat("Ascl1 alone columns:\n");  print(ascl1_alone_cols)
+cat("Phox2b+Ascl1 columns:\n"); print(phox2b_ascl1_cols)
+
+# ── Calculate per-cluster means and find target cluster ───────────────────────
+cluster_means <- data.frame(
+  cluster     = 1:3,
+  ascl1_mean  = tapply(rowMeans(expr_z[, ascl1_alone_cols,  drop = FALSE]), cluster_assignments, mean),
+  phox2b_mean = tapply(rowMeans(expr_z[, phox2b_ascl1_cols, drop = FALSE]), cluster_assignments, mean)
+) %>%
+  mutate(phox2b_lower = phox2b_mean < ascl1_mean)
+
+print(cluster_means)
+
+target_cluster <- cluster_means %>%
+  dplyr::filter(phox2b_lower) %>%
+  mutate(diff = ascl1_mean - phox2b_mean) %>%
+  slice_max(diff, n = 1) %>%
+  pull(cluster)
+
+cat("Target cluster:", target_cluster, "\n")
+
+genes_of_interest <- names(cluster_assignments[cluster_assignments == target_cluster])
+cat("Number of genes:", length(genes_of_interest), "\n")
+
+# ── Build heatmap using pre-computed clusters (reproducible) ──────────────────
+row_split <- factor(paste0("C", cluster_assignments), levels = paste0("C", 1:3))
+
+# Label only the first 10 genes of interest
+label_genes <- head(genes_of_interest, 10)
+row_labels   <- rownames(expr_z)
+ha_right <- rowAnnotation(
+  link = anno_mark(
+    at    = which(row_labels %in% label_genes),
+    labels = row_labels[which(row_labels %in% label_genes)],
+    labels_gp = gpar(fontsize = 8),
+    padding = unit(1, "mm")
+  )
+)
+
+hm <- Heatmap(
+  expr_z,
+  name              = "Z-score",
+  show_row_names    = FALSE,
+  show_column_names = FALSE,
+  cluster_rows      = TRUE,
+  cluster_columns   = FALSE,
+  row_split         = row_split,
+  cluster_row_slices = FALSE,
+  row_title         = "Phox2b-associated genes",
+  column_title      = "Samples",
+  col = met.brewer("OKeeffe1", direction = -1)
+)
+
+draw(hm)
+
+png(
+  filename = here("../Figures/Fig6H-1.png"),
+  width = 9, height = 24, units = "cm", bg = "white", res = 300
+)
+draw(hm)
+dev.off()
+
+# ── Check gene symbol mapping before GO ──────────────────────────────────────
+test_map <- clusterProfiler::bitr(
+  head(genes_of_interest, 10),
+  fromType = "SYMBOL",
+  toType   = "ENTREZID",
+  OrgDb    = org.Mm.eg.db
+)
+print(test_map)
+
+# ── GO analysis on target cluster genes ──────────────────────────────────────
+go_result <- enrichGO(
+  gene          = genes_of_interest,
+  OrgDb         = org.Mm.eg.db,
+  keyType       = "SYMBOL",
+  ont           = "BP",
+  pAdjustMethod = "BH",
+  pvalueCutoff  = 0.05,
+  qvalueCutoff  = 0.05,
+  readable      = TRUE
+)
+
+if (!is.null(go_result) && nrow(as.data.frame(go_result)) > 0) {
+  go_simplified <- clusterProfiler::simplify(go_result, cutoff = 0.7)
+  go_df <- as.data.frame(go_simplified)
+  print(head(go_df))
+  write.csv(go_df, file = here("../Data/cluster_phox2b_lower_GO.csv"), row.names = FALSE)
+  tam_cols <- MetBrewer::met.brewer("Tam", direction = -1)
+  p <- dotplot(go_simplified, showCategory = 6) +
+    scale_fill_gradientn(colours = tam_cols) +
+    scale_y_discrete(labels = function(x) str_wrap(x, width = 20)) +
+    ggtitle("GO:BP — mESC genes lower in Phox2b+Ascl1") +
+    theme_cowplot()
+  print(p)
+  ggsave(
+    filename = here("../Figures/Fig6I_GO-2.png"),
+    plot     = p,
+    width    = 12,
+    height   = 14,
+    units    = "cm",
+    dpi      = 300,
+    bg       = "white"
+  )
+} else {
+  cat("No significant GO terms found\n")
+}
+
+# ── Save gene list ────────────────────────────────────────────────────────────
+write.csv(
+  data.frame(symbol = genes_of_interest),
+  file = here("../Data/cluster_phox2b_lower_genes.csv"),
+  row.names = FALSE
+)
+
+```
+
+Fig 7F-G - quantifying TUBB3-positive cells 
+
+```{r, messages=FALSE}
+
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+library(here)
+
+data <- read.csv(file = here("Nuclei_2.csv"))
+
+data <- data %>% mutate(Metadata_Condition = recode(Metadata_Condition, "dex" = "ascl1"))
+
+tubb3_percentage <- data %>%
+  filter(!is.na(Metadata_Celltype) & Metadata_Celltype != "") %>%
+  filter(Metadata_Cofactor != "gbx1" & Metadata_Cofactor != "gg5") %>%
+  group_by(Metadata_Image, Metadata_Celltype, Metadata_Condition, Metadata_Cofactor, Metadata_Rep, Metadata_Well) %>%
+  summarise(
+    Total_Cells = n(),
+    Positive_Cells = sum(Intensity_MeanIntensity_Tubb3 > 0.16),
+    Percent_Positive = (Positive_Cells / Total_Cells) * 100,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Metadata_Celltype = factor(Metadata_Celltype, levels = c("mESC", "EpiLC", "NE")),
+    Metadata_Condition = factor(Metadata_Condition, levels = c("control", "ascl1", "dox", "ascl1dox")),
+    Metadata_Cofactor = factor(Metadata_Cofactor, levels = c("gg5", "dlx3", "phox2a", "phox2b", "lmx1a", "gbx1"))
+  )
+
+comparisons <- list(
+  c("ascl1", "control"),
+  c("ascl1", "dox"),
+  c("ascl1", "ascl1dox")
+)
+
+# Define colors per cell type
+colors_list <- list(
+  "mESC"  = c("control" = "#AAE4E9", "dox" = "#AAE4E9", "ascl1" = "#4FAAB2", "ascl1dox" = "#4FAAB2"),
+  "EpiLC" = c("control" = "#FFE8B9", "dox" = "#FFE8B9", "ascl1" = "#FFD170", "ascl1dox" = "#FFD170"),
+  "NE"    = c("control" = "#FFBCB9", "dox" = "#FFBCB9", "ascl1" = "#FF7770", "ascl1dox" = "#FF7770")
+)
+
+plots <- lapply(levels(tubb3_percentage$Metadata_Celltype), function(ct) {
+  df <- filter(tubb3_percentage, Metadata_Celltype == ct)
+  ggplot(df, aes(x = Metadata_Condition, y = Percent_Positive, fill = Metadata_Condition)) +
+    geom_boxplot(outlier.shape = NA) +
+    geom_jitter(width = 0.2, alpha = 0.7, color = "black") +
+    facet_wrap(~Metadata_Cofactor, nrow = 1) +
+    scale_fill_manual(values = colors_list[[ct]]) +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    labs(title = ct, x = "Condition", y = "Percentage of Tubb3-positive cells") +
+    stat_compare_means(
+      comparisons = comparisons,
+      method = "t.test",
+      label = "p.signif",
+      p.adjust.method = "BH",
+      tip.length = 0.01,
+      step.increase = 0.1,
+      aes(group = Metadata_Condition),label.y = 25
+    )
+})
+
+# Save each plot
+for (i in seq_along(plots)) {
+  ggsave(plots[[i]], filename = here(paste0(levels(tubb3_percentage$Metadata_Celltype)[i], "_tubb3_plot.png")),
+         width = 10, height = 3)
+}
+
+plots
+
+```
+
+
+# FIG S7 
+
+Fig S7A-A'' - volcano plots for all conditions in mesc 
+
+```{r}
+
+phox2b_degs <- read.table(file = here("../Data/RNAseq_Cofactor_Phox2b_DEGs.csv"), sep = ",", header = TRUE)
+
+library(ggplot2)
+library(patchwork)
+library(ggrepel)
+
+make_volcano <- function(data, lfc_col, padj_col, title,
+                         lfc_thresh = 1, padj_thresh = 0.01) {
+  df <- data %>%
+    transmute(
+      symbol,
+      LFC           = .data[[lfc_col]],
+      padj          = .data[[padj_col]],
+      neglog10_padj = -log10(padj),
+      sig = case_when(
+        padj < padj_thresh & LFC >  lfc_thresh ~ "up",
+        padj < padj_thresh & LFC < -lfc_thresh ~ "down",
+        TRUE                                   ~ "ns"
+      ),
+      sig = factor(sig, levels = c("ns", "down", "up"))
+    )
+  
+  # ── Count up/down for annotation ───────────────────────────────────────────
+  n_up   <- sum(df$sig == "up")
+  n_down <- sum(df$sig == "down")
+  
+  ggplot(df, aes(x = LFC, y = neglog10_padj, colour = sig)) +
+    geom_point(size = 1, alpha = 0.5) +
+    annotate("text",
+             x = Inf, y = Inf,
+             hjust = 1.1, vjust = 1.5,
+             label = paste0("Up: ", n_up),
+             colour = "#79c1d1", size = 3.5, fontface = "bold") +
+    annotate("text",
+             x = -Inf, y = Inf,
+             hjust = -0.1, vjust = 1.5,
+             label = paste0("Down: ", n_down),
+             colour = "#404040", size = 3.5, fontface = "bold") +
+    scale_colour_manual(
+      values = c(
+        up   = "#79c1d1",
+        down = "#404040",
+        ns   = "#D3D3D3"
+      ),
+      labels = c(up = "Up", down = "Down", ns = "NS")
+    ) +
+    geom_vline(xintercept = c(-lfc_thresh, lfc_thresh),
+               linetype = "dashed", colour = "grey40", linewidth = 0.4) +
+    geom_hline(yintercept = -log10(padj_thresh),
+               linetype = "dashed", colour = "grey40", linewidth = 0.4) +
+    labs(
+      title  = title,
+      x      = "Log2 Fold Change",
+      y      = expression(-log[10](p[adj])),
+      colour = NULL
+    ) +
+    theme_classic(base_size = 11) +
+    scale_y_continuous(limits = c(0, 300)) +
+    scale_x_continuous(limits = c(-6, 8)) +
+    theme(
+      plot.title      = element_text(hjust = 0.5, face = "bold"),
+      legend.position = "bottom"
+    )
+}
+
+# ── Build each plot ───────────────────────────────────────────────────────────
+p1 <- make_volcano(phox2b_degs, "mESC_Ascl1_LFC",  "mESC_Ascl1_padj",  "Control vs ASCL1")
+p2 <- make_volcano(phox2b_degs, "mESC_Phox2b_LFC", "mESC_Phox2b_padj", "Control vs PHOX2B")
+p3 <- make_volcano(phox2b_degs, "mESC_Combo_LFC",  "mESC_Combo_padj",  "Control vs ASCL1+PHOX2B")
+
+# ── Combine ───────────────────────────────────────────────────────────────────
+full <- p1 + p2 + p3 + plot_layout(ncol = 3, guides = "collect") &
+  theme(legend.position = "bottom")
+
+ggsave(full, filename = here("../Figures/Fig_Phox2b_RNAseq.png"), width = 9, height = 4, dpi = 300)
+
+```
+
