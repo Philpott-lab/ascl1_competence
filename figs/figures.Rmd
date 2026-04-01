@@ -27,7 +27,7 @@ RNAseq experiment 3:
 
 Fig 1F - PCA plot
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 library(here)
 library(tidyverse)
@@ -44,8 +44,6 @@ dds <- readRDS(here("../Data/RNAseq_ASCL1_dds.Rds"))
 rna_vsd <- assay(vst(dds, blind=FALSE))
 
 rna_pca <- pca(rna_vsd, metadata = colData(dds), removeVar = 0.95) # takes just top 5% variable genes 
-
-# plot pca 1 versus 2 (Figu 2B) based on top 5% of variable genes
 
 rna_pcaRot <- rna_pca$rotated[,c(1:3)]
 rna_pcaRot <- cbind(rna_pcaRot, Group = rna_pca$metadata$Group)
@@ -86,7 +84,7 @@ dev.off()
 
 Fig 1G - how many DEGs after ASCL1 in each cell type at 6 and 24 hours
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 library(here)
 library(tidyverse)
@@ -137,7 +135,7 @@ ggsave(plot = p, filename = here("../Figures/Fig1G.png"), height = 4, width = 4,
 
 Fig 1H - venn diagram of DEGs up at 24 hours 
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 library(here)
 library(tidyverse)
@@ -168,7 +166,7 @@ ggsave(here("../Figures/Fig1H.png"), t24, width = 4, height = 4, dpi = 300)
 
 Fig 1I - heatmap of all upregulated DEGs across conditions 
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 library(here)
 library(tidyverse)
@@ -277,7 +275,7 @@ dev.off()
 
 Fig 1J–L - GO analysis and plots of upregulated DEGs at 24 hours 
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 library(here)
 library(tidyverse)
@@ -367,7 +365,7 @@ ggsave(plot = p_ne, filename = here("../Figures/Fig1L-2.png"), width = 3.5, heig
 
 Fig S1I–K - volcano plots of DEGs after 24 hours ASCL1 in each condition 
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 # note the log fold change is shrunk using ashr, represents the comparison against t0 gg5, but changes are filtered to be also significant in the vs c11 comparison 
 
@@ -453,15 +451,15 @@ plotVolcano(degs, "NE_t24_gg5", upcolour = "#FB7D80")
 # using the volcano plot function #
 #----------------------------------#
 
-ggsave(plot = plotVolcano(degs, "mESC_t24_gg5", top_n = 0), file = here("../Figures/Fig1J.png"), height = 4, width = 3.5, dpi = 300)
-ggsave(plot = plotVolcano(degs, "EpiLC_t24_gg5", upcolour = "#FDD163"), file = here("../Figures/Fig1K.png"), height = 4, width = 3.5,, dpi = 300)
-ggsave(plot = plotVolcano(degs, "NE_t24_gg5", upcolour = "#FB7D80"), file = here("../Figures/Fig1L.png"), height = 4, width = 3.5,, dpi = 300)
+ggsave(plot = plotVolcano(degs, "mESC_t24_gg5", top_n = 0), file = here("../Figures/FigS1I.png"), height = 4, width = 3.5, dpi = 300)
+ggsave(plot = plotVolcano(degs, "EpiLC_t24_gg5", upcolour = "#FDD163"), file = here("../Figures/FigS1J.png"), height = 4, width = 3.5,, dpi = 300)
+ggsave(plot = plotVolcano(degs, "NE_t24_gg5", upcolour = "#FB7D80"), file = here("../Figures/FigS1K.png"), height = 4, width = 3.5,, dpi = 300)
 
 ```
 
 Fig S1L - venn diagram of DEGs up at 6 hours 
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 library(here)
 library(tidyverse)
@@ -489,13 +487,13 @@ t6 <- plot(euler_6h,
 
 t6 
 
-ggsave(here("../Figures/FigS1I.png"), t6, width = 4, height = 4, dpi = 300)
+ggsave(here("../Figures/FigS1L.png"), t6, width = 4, height = 4, dpi = 300)
 
 ```
 
 Fig S1M-O - volcano plots of DEGs after 6 hours 
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 # note the log fold change is shrunk using ashr, represents the comparison against t0 gg5, but changes are filtered to be also significant in the vs c11 comparison 
 
@@ -591,9 +589,9 @@ ggsave(plot = p3, file = here("../Figures/FigS1L-1.png"), height = 4, width = 3.
 
 ```
 
-Fig S1M-O - GO analysis of DEGs after 6 hours to match volcano plots 
+Fig S1M-O pt.2 - GO analysis of DEGs after 6 hours to match volcano plots 
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 library(here)
 library(tidyverse)
@@ -626,7 +624,7 @@ p_mesc <- barplot(smp_mesc, showCategory = 5) + theme_cowplot() + scale_y_discre
 
 p_mesc
 
-ggsave(plot = p_mesc, filename = here("../Figures/FigS1J-2.png"), width = 3.5, height = 4, dpi = 300, bg = "white")
+ggsave(plot = p_mesc, filename = here("../Figures/FigS1M-2.png"), width = 3.5, height = 4, dpi = 300, bg = "white")
 
 
 
@@ -650,7 +648,7 @@ p_epilc <- barplot(smp_epilc, showCategory = 5) + theme_cowplot() + scale_y_disc
 
 p_epilc
 
-ggsave(plot = p_epilc, filename = here("../Figures/FigS1K-2.png"), width = 3.5, height = 4, dpi = 300, bg = "white")
+ggsave(plot = p_epilc, filename = here("../Figures/FigS1N-2.png"), width = 3.5, height = 4, dpi = 300, bg = "white")
 
 
 
@@ -674,7 +672,7 @@ p_ne <- barplot(smp_ne, showCategory = 5) + theme_cowplot() + scale_y_discrete(l
 
 p_ne
 
-ggsave(plot = p_ne, filename = here("../Figures/FigS1L-2.png"), width = 3.5, height = 4, dpi = 300, bg = "white")
+ggsave(plot = p_ne, filename = here("../Figures/FigS1O-2.png"), width = 3.5, height = 4, dpi = 300, bg = "white")
 
 ```
 
@@ -819,7 +817,7 @@ for (gene.ofi in genes.ofi) {
 
 Fig 2D - categorising peaks based on cell type binding & proximal DEGs
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 library(here)
 library(tidyverse)
@@ -875,7 +873,7 @@ write.table(peaks %>% dplyr::filter(peakset %in% c("Universal", "mESC_NE")),
 
 Fig 2E - boxplots to show ChIP-seq signal strength at sites linked to NE-specific DEGs 
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 library(rtracklayer)
 library(GenomicRanges)
@@ -1025,7 +1023,7 @@ plot_ascl1_signal <- function(
 
   ggsave(
     p,
-    filename = file.path(outdir, paste0("Fig2G", label, ".png")),
+    filename = file.path(outdir, paste0("Fig2E_", label, ".png")),
     bg = "white",
     dpi = 300,
     width = 2,
@@ -1047,7 +1045,7 @@ res_notneonly$plot
 
 Fig S2B - correlation matrix of peaksets across replicates / conditions 
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 library(here)
 library(DiffBind)
@@ -1091,7 +1089,7 @@ dev.off()
 
 Fig S2C - PCA plot for ChIP-seq samples with normalisation 
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 # pca plots for normalised chip-seq counts 
 
 library(DiffBind)
@@ -1145,7 +1143,7 @@ plotHeatmap -m ../Data/deeptools/matrix/matrix_ascl1chip_mescreps.mat.gz -out ..
 
 Fig S2E - annotation of peaks in mESC, EpiLC and NE to show enhancer / promoter binding sites
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 library(here)
 library(tidyverse)
@@ -1179,7 +1177,7 @@ dev.off()
 
 Fig S2H - correlation heatmap for published ASCL1 ChIP-seq binding sites
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 # distance matrix for published chip-seq sets
 
@@ -1279,7 +1277,7 @@ p <- pheatmap(cor_matrix,
          color = met.brewer(name = "VanGogh3", direction = 1)
 )
 
-png(filename = here("../Figures/FigS2G.png"), height = 5, width = 6, units = "in", res = 300)
+png(filename = here("../Figures/FigS2H.png"), height = 5, width = 6, units = "in", res = 300)
 p
 dev.off()
 
@@ -1340,7 +1338,7 @@ plotProfile -m matrix/matrix_ascl1chip_borromeoNTsites.mat.gz -out plots/NTsites
 
 Fig 3B - PCA plot of ATAC-seq samples 
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 library(here)
 library(tidyverse)
@@ -1537,7 +1535,7 @@ plotHeatmap -m deeptools/matrix/matrix_653_all_allT.mat.gz -out deeptools/plots/
 
 Fig 3F - donut plots of percentage of sites that are bound & accessible in mESC and NE 
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 library(here)
 library(GenomicRanges)
@@ -1601,6 +1599,9 @@ mesc.atac.24.gr <- mesc.atac.24 %>% GRanges()
 ne.atac <- read.table(file = here("../Data/ATACseq_NE_0h_peaks_in3of4.bed"), col.names = c("seqnames", "start", "end", "peakID"))
 ne.atac.gr <- ne.atac %>% GRanges()
 
+# load in the ne peaks t=24
+ne.atac.24 <- read.table(file = here("../Data/ATACseq_NE_24h_peaks_in3of4.bed"), col.names = c("seqnames", "start", "end", "peakID"))
+ne.atac.24.gr <- ne.atac %>% GRanges()
 
 # find overlaps 
 
@@ -1622,9 +1623,12 @@ also_mesc_neATAC   <- calc_open(also_mesc.gr, ne.atac.gr)
 
 all653_ne <- calc_open(all_653.gr, ne.atac.gr)
 
-all653_mesc <- calc_open(all_653.gr, mesc.atac.gr)
+all653_ne_24 <- calc_open(all_653.gr, ne.atac.24.gr)
 
-all653_mesc24 <- calc_open(all_653.gr, mesc.atac.24.gr)
+
+# all653_mesc <- calc_open(all_653.gr, mesc.atac.gr)
+# 
+# all653_mesc24 <- calc_open(all_653.gr, mesc.atac.24.gr)
 
 # plot donut plot to show % of sites that are open (e.g overlap with atac peak) in mESC and then in NE, for each of the two sets of ChIPseq sites - so four plots in total
 
@@ -1645,30 +1649,35 @@ plot_donut <- function(df) {
     theme(legend.position = "none")
 }
 
-p0 <- plot_donut(all653_ne)
-ggsave(p0, filename = here("../Figures/Fig4F-ne0.png"), bg = "white", dpi = 300, height = 3, width = 3)
+p1 <- plot_donut(all653_ne)
+ggsave(p1, filename = here("../Figures/Fig3F-ne0.png"), bg = "white", dpi = 300, height = 3, width = 3)
 
-p653_mesc0 <- plot_donut(all653_mesc)
-ggsave(filename = here("../Figures/Fig4F-mesc0.png"), bg = "white", dpi = 300, height = 3, width = 3)
+p2 <- plot_donut(all653_ne_24)
+ggsave(p2, filename = here("../Figures/Fig3F-ne24.png"), bg = "white", dpi = 300, height = 3, width = 3)
 
-p653_mesc24 <- plot_donut(all653_mesc24)
-ggsave(filename = here("../Figures/Fig4F-mesc24.png"), bg = "white", dpi = 300, height = 3, width = 3)
 
-p1 <- plot_donut(not_mesc_mescATAC)
-ggsave(filename = here("../Figures/Fig4E-1.png"), bg = "white", dpi = 300, height = 3, width = 3)
 
-p2 <- plot_donut(not_mesc_neATAC)
-ggsave(filename = here("../Figures/Fig4E-2.png"), bg = "white", dpi = 300, height = 3, width = 3)
-
-p3 <- plot_donut(also_mesc_mescATAC)
-ggsave(filename = here("../Figures/Fig4F-1.png"), bg = "white", dpi = 300, height = 3, width = 3)
-
-p4 <- plot_donut(also_mesc_neATAC)
-ggsave(filename = here("../Figures/Fig4F-2.png"), bg = "white", dpi = 300, height = 3, width = 3)
+# p653_mesc0 <- plot_donut(all653_mesc)
+# ggsave(filename = here("../Figures/Fig4F-mesc0.png"), bg = "white", dpi = 300, height = 3, width = 3)
+# 
+# p653_mesc24 <- plot_donut(all653_mesc24)
+# ggsave(filename = here("../Figures/Fig4F-mesc24.png"), bg = "white", dpi = 300, height = 3, width = 3)
+# 
+# p1 <- plot_donut(not_mesc_mescATAC)
+# ggsave(filename = here("../Figures/Fig4E-1.png"), bg = "white", dpi = 300, height = 3, width = 3)
+# 
+# p2 <- plot_donut(not_mesc_neATAC)
+# ggsave(filename = here("../Figures/Fig4E-2.png"), bg = "white", dpi = 300, height = 3, width = 3)
+# 
+# p3 <- plot_donut(also_mesc_mescATAC)
+# ggsave(filename = here("../Figures/Fig4F-1.png"), bg = "white", dpi = 300, height = 3, width = 3)
+# 
+# p4 <- plot_donut(also_mesc_neATAC)
+# ggsave(filename = here("../Figures/Fig4F-2.png"), bg = "white", dpi = 300, height = 3, width = 3)
 
 ```
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 library(here)
 library(GenomicRanges)
@@ -1799,7 +1808,7 @@ plotProfile -m matrix/matrix_ascl1chip_closedNE_EpiLC.mat.gz \
 
 ```
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 library(GenomicRanges)
 library(here)
@@ -1835,7 +1844,7 @@ write.table(nesites.opened.export, file = here("../Data/ChIPseq_653NEsites_opene
 
 Fig S3A - number of ATAC-seq peaks in each sample 
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 library(here)
 library(tidyverse)
@@ -1900,7 +1909,7 @@ ggsave(plot = peakplot, filename = here("../Figures/FigS3A.png"), dpi = 300, wid
 
 Fig S3B - FRiP % of ATAC-seq samples
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 library(here)
 library(tidyverse)
@@ -1944,7 +1953,7 @@ ggsave(plot = frip, filename = here("../Figures/FigS3B.png"), width = 5, height 
 
 Fig S3C - TSS enrichment 
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 library(here)
 library(tidyverse)
@@ -2007,7 +2016,7 @@ ggsave(plot = tss, filename = here("../Figures/FigS3C.png"), width = 5, height =
 
 Fig S3D - chrM reads
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 library(here)
 library(tidyverse)
 
@@ -2265,6 +2274,8 @@ ChIPseq_ASCL1_universal10k.bed \
 Fig S4C - heatmap for H3K4me1
 
 ```{bash}
+
+computeMatrix scale-regions -S \
 Data/chipseq_published/bleckwehl2020/GSM4694551_H3K4me1_mESC_mm39.bw \
 Data/chipseq_published/cruzmolina2017/GSM4694551_H3K4me1_EpiLC_mm39.bw \
 -R ChIPseq_ASCL1_mesconly10k.bed \
@@ -2286,7 +2297,7 @@ ChIPseq_ASCL1_universal10k.bed \
 
 Fig 5C - PCA plot for HDACi RNA-seq 
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 library(here)
 library(tidyverse)
@@ -2315,7 +2326,7 @@ pcaplot.12 <- ggplot(pcaData.12, aes(PC1, PC2, color=Group, shape=TSA)) +
   #coord_fixed() + 
   theme_cowplot()
 
-ggsave(pcaplot.12, filename = here("../Figures/Fig5B.png"), device = "png", dpi = 300, height = 8, width = 8, units = "cm", bg = "white")
+ggsave(pcaplot.12, filename = here("../Figures/Fig5C.png"), device = "png", dpi = 300, height = 8, width = 8, units = "cm", bg = "white")
 
 
 # plot pc2 pc3 
@@ -2336,7 +2347,7 @@ ggsave(pcaplot.23, filename = here("../Figures/FigS5B.png"), device = "png", dpi
 
 Fig 5D - counts for selected genes in mESC with HDACi
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 library(here)
 library(tidyverse)
 library(ggplot2)
@@ -2535,11 +2546,14 @@ col_ann <- HeatmapAnnotation(
   ASCL1 = col_meta$ASCL1,
   TSA   = col_meta$TSA,
   col   = list(
-    ASCL1 = c("None" = "#AAE4E9", "Dex"  = "#4FAAB2"),
-    TSA   = c("DMSO" = "#D3D3D3", "TSA"  = "#404040")
+    ASCL1 = c("None" = "#AAE4E9", "Dex" = "#4FAAB2"),
+    TSA   = c("DMSO" = "#D3D3D3", "TSA" = "#404040")
   ),
   annotation_name_side = "left"
 )
+
+# ── Column order ──────────────────────────────────────────────────────────────
+col_order <- order(col_meta$condition)
 
 # ── Row annotation for NE-bound genes ────────────────────────────────────────
 ne.degs <- read.table(here("../Data/ChIPseq_NEboundgenes_208.txt")) %>% pull(x)
@@ -2701,7 +2715,7 @@ message(
 
 Fig 5F' - GO analysis for DEGs with and without TSA
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 library(here)
 library(tidyverse)
 library(clusterProfiler)
@@ -2844,7 +2858,7 @@ ggsave(NE_synergy, filename = here("../Figures/Fig_HDACi_RNAseq_NE_synergy_new.p
 
 Fig 6A - cofactor motif versus expression for NE 
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 library(here)
 library(tidyverse)
 library(AnnotationHub)
@@ -2992,7 +3006,7 @@ ggsave(filename = here("../Figures/Fig6A.png"), width = 5, height = 5, bg = "whi
 
 Fig S6A - cofactor motif versus expression for mESC 
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 library(here)
 library(tidyverse)
 library(AnnotationHub)
@@ -3435,7 +3449,7 @@ hm <- Heatmap(
 draw(hm)
 
 png(
-  filename = here("../Figures/Fig6H-1.png"),
+  filename = here("../Figures/Fig7B.png"),
   width = 9, height = 24, units = "cm", bg = "white", res = 300
 )
 draw(hm)
@@ -3475,7 +3489,7 @@ if (!is.null(go_result) && nrow(as.data.frame(go_result)) > 0) {
     theme_cowplot()
   print(p)
   ggsave(
-    filename = here("../Figures/Fig6I_GO-2.png"),
+    filename = here("../Figures/Fig7B-GO.png"),
     plot     = p,
     width    = 12,
     height   = 14,
@@ -3498,14 +3512,14 @@ write.csv(
 
 Fig 7F-G - quantifying TUBB3-positive cells 
 
-```{r, messages=FALSE}
+```{r, message=FALSE}
 
 library(dplyr)
 library(ggplot2)
 library(ggpubr)
 library(here)
 
-data <- read.csv(file = here("Nuclei_2.csv"))
+data <- read.csv(file = here("../Data/Nuclei_2.csv"))
 
 data <- data %>% mutate(Metadata_Condition = recode(Metadata_Condition, "dex" = "ascl1"))
 
