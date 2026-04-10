@@ -1,0 +1,41 @@
+# =============================================================================
+# config.yaml — ascl1_competence analysis global parameters
+#
+# Single source of truth for all pipeline parameters.
+# Read by run_pipeline.sh (via yq) and R scripts (via the yaml package).
+# Commit this file to git to document the parameters used for each run.
+# =============================================================================
+
+# ── Directory paths ──────────────────────────────────────────────────────────
+paths:
+  install_dir:  "/data/analysis_jlb"      # project root
+  repo_dir:     "/data/analysis_jlb/ascl1_competence"         # git repository
+  data_dir:     "/data/analysis_jlb/Data"         # Data/ folder (atac-seq/, chip-seq/, rna-seq/)
+  figures_dir:  "/data/analysis_jlb/Figures"      # output figures
+
+# ── Compute resources ────────────────────────────────────────────────────────
+compute:
+  threads:       16   # CPUs for alignment, bamCoverage, etc.
+  parallel_jobs: 4          # samples processed in parallel (peak calling)
+
+# ── Genome parameters ────────────────────────────────────────────────────────
+genome:
+  mm39_size:       2468088461   # effective genome size for mm39
+  ensembl_release: 113          # Ensembl release for Kallisto index
+
+# ── ATAC-seq parameters ──────────────────────────────────────────────────────
+atac:
+  diffbind_min_overlap: 3    # min replicates per condition for consensus peaks
+  diffbind_summits:     75   # ±bp extension around peak summit for counting
+  bigwig_bin_size:      10   # bigwig bin size in bp
+
+# ── ChIP-seq parameters ──────────────────────────────────────────────────────
+chip:
+  bigwig_bin_size: 10
+
+# ── RNA-seq parameters ───────────────────────────────────────────────────────
+rna:
+  kallisto_bootstraps: 100
+  # phox2b is single-end; estimate fragment length from FastQC/Picard before running
+  phox2b_fragment_length: 200
+  phox2b_fragment_sd:     20
