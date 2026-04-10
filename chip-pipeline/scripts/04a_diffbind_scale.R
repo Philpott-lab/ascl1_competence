@@ -15,7 +15,7 @@
 #### INPUT DATA ####
 # Samples from HA-Ascl1 ChIP in three conditions: mESC, EpiLC, NE
 # C11 cells used as negative control (no Ascl1 expression) — peaks used as blacklist
-# DiffBind sample sheet expected at: ../Data/config/chip_DiffBind_samples.csv
+# DiffBind sample sheet expected at: ../Data/chip-seq/ChIPseq_ASCL1_samples.csv
 #   Tissue column should contain "gG5" for experimental samples and "C11" for controls
 # Peak files expected as produced by chip_03_call_peaks.sh (MACS3, narrowPeak format)
 # MACS3 peak directory expected at: ../Data/macs3/
@@ -58,17 +58,17 @@ genome_mm39 <- BSgenome.Mmusculus.UCSC.mm39
 # C11 cells do not express Ascl1, so any peaks called in this condition represent
 # non-specific signal and should be excluded from downstream analysis
 c11_peak_files <- list.files(
-  path    = here("../Data/macs3/"),
+  path    = here("../Data/chip-seq/macs3/"),
   pattern = "^C11.*\\.narrowPeak$",
   full.names = FALSE
 )
 
 if (length(c11_peak_files) == 0) {
-  stop("[ERROR]: No C11 narrowPeak files found in ../Data/macs3/. Check peak directory.")
+  stop("[ERROR]: No C11 narrowPeak files found in ../Data/chip-seq/macs3/. Check peak directory.")
 }
 
 c11_list <- lapply(c11_peak_files, function(file) {
-  read.table(file.path(here("../Data/macs3/"), file), header = FALSE, sep = "\t")
+  read.table(file.path(here("../Data/chip-seq/macs3/"), file), header = FALSE, sep = "\t")
 })
 
 c11_combined    <- do.call(rbind, c11_list)
@@ -108,7 +108,7 @@ message("Combined blacklist regions: ", length(combined_blacklist))
 # Set working directory for relative BAM paths in the DiffBind sample sheet
 setwd(here(".."))
 
-chip_samples <- read.csv(here("../Data/config/chip_DiffBind_samples.csv"))
+chip_samples <- read.csv(here("../Data/chip-seq/ChIPseq_ASCL1_samples.csv"))
 
 # Retain only experimental gG5 samples; C11 samples used only for blacklist above
 chip_samples <- chip_samples %>% dplyr::filter(Tissue == "gG5")
@@ -204,17 +204,17 @@ norm <- dba.analyze(chip_dba, bRetrieveAnalysis = TRUE)
 # InvNormFacs = 1 / NormFacs is the value passed to bamCoverage --scaleFactor
 # A library with a size factor > 1 (larger than average) gets scaled down (< 1)
 scale_factor_df <- data.frame(
-  bamID        = c("gG5_mESC_HA_1_markdup.bam",
-                   "gG5_mESC_HA_2_markdup.bam",
-                   "gG5_mESC_HA_3_markdup.bam",
-                   "gG5_mESC_HA_4_markdup.bam",
-                   "gG5_EpiLC_HA_1_markdup.bam",
-                   "gG5_EpiLC_HA_2_markdup.bam",
-                   "gG5_EpiLC_HA_3_markdup.bam",
-                   "gG5_EpiLC_HA_4_markdup.bam",
-                   "gG5_NE_HA_1_markdup.bam",
-                   "gG5_NE_HA_2_markdup.bam",
-                   "gG5_NE_HA_4_markdup.bam"),
+  bamID        = c("ChIP_gG5_mESC_HA_1_markdup.bam",
+                   "ChIP_gG5_mESC_HA_2_markdup.bam",
+                   "ChIP_gG5_mESC_HA_3_markdup.bam",
+                   "ChIP_gG5_mESC_HA_4_markdup.bam",
+                   "ChIP_gG5_EpiLC_HA_1_markdup.bam",
+                   "ChIP_gG5_EpiLC_HA_2_markdup.bam",
+                   "ChIP_gG5_EpiLC_HA_3_markdup.bam",
+                   "ChIP_gG5_EpiLC_HA_4_markdup.bam",
+                   "ChIP_gG5_NE_HA_1_markdup.bam",
+                   "ChIP_gG5_NE_HA_2_markdup.bam",
+                   "ChIP_gG5_NE_HA_4_markdup.bam"),
   NormFacs     = norm$sizeFactor,
   InvNormFacs  = 1 / norm$sizeFactor
 )

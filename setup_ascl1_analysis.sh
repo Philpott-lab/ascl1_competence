@@ -216,11 +216,6 @@ paths:
   data_dir:     "$DATA_DIR"         # Data/ folder (atac-seq/, chip-seq/, rna-seq/)
   figures_dir:  "$FIGURES_DIR"      # output figures
 
-  # ChIP input-matching CSV: specifies which input control BAM pairs with each
-  # ChIP sample for MACS3 peak calling. Create this file and set the path here.
-  # Format: CSV with columns: sample, target, input
-  chip_input_matching: ""
-
 # ── Compute resources ────────────────────────────────────────────────────────
 compute:
   threads:       $THREADS   # CPUs for alignment, bamCoverage, etc.
@@ -699,7 +694,6 @@ fi
 INSTALL_DIR="$(yq  '.paths.install_dir'         "$CONFIG")"
 REPO_DIR="$(yq     '.paths.repo_dir'            "$CONFIG")"
 DATA_DIR="$(yq     '.paths.data_dir'            "$CONFIG")"
-CHIP_INPUT_MATCHING="$(yq '.paths.chip_input_matching' "$CONFIG")"
 
 THREADS="$(yq      '.compute.threads'           "$CONFIG")"
 PARALLEL_JOBS="$(yq '.compute.parallel_jobs'    "$CONFIG")"
@@ -788,22 +782,21 @@ bash "$CHIP_SCRIPTS/01_prepare_index.sh" "$CHIP_DIR" "$THREADS"
 log "ChIP 2/5: Preprocessing and aligning reads..."
 bash "$CHIP_SCRIPTS/02_preprocess_align.sh" \
     "$CHIP_DIR" \
-    "$REPO_DIR/chip-pipeline/ChIPseq_ASCL1_samples.csv" \
+    "$REPO_DIR/chip-pipeline/ChIPseq_align_samples.csv" \
     "$THREADS"
 
 [[ ! -L "$CHIP_DIR/bam" ]] \
     && ln -s "$CHIP_DIR/cleanbams" "$CHIP_DIR/bam" \
     && log "Created symlink: chip-seq/bam → chip-seq/cleanbams"
 
-if [[ -z "$CHIP_INPUT_MATCHING" || "$CHIP_INPUT_MATCHING" == "null" ]]; then
-    log "[WARNING]: ChIP Step 3 skipped — set paths.chip_input_matching in config.yaml"
-else
-    log "ChIP 3/5: Calling peaks (MACS3)..."
-    bash "$CHIP_SCRIPTS/03_callpeaks.sh" "$CHIP_DIR" "$CHIP_INPUT_MATCHING" "$PARALLEL_JOBS"
-    [[ ! -L "$CHIP_DIR/peaks" ]] \
-        && ln -s "$CHIP_DIR/macs3" "$CHIP_DIR/peaks" \
-        && log "Created symlink: chip-seq/peaks → chip-seq/macs3"
-fi
+log "ChIP 3/5: Calling peaks (MACS3)..."
+bash "$CHIP_SCRIPTS/03_callpeaks.sh" \
+    "$CHIP_DIR" \
+    "$REPO_DIR/chip-pipeline/ChIPseq_input_matching.csv" \
+    "$PARALLEL_JOBS"
+[[ ! -L "$CHIP_DIR/peaks" ]] \
+    && ln -s "$CHIP_DIR/macs3" "$CHIP_DIR/peaks" \
+    && log "Created symlink: chip-seq/peaks → chip-seq/macs3"
 
 log "ChIP 4a/5: DiffBind spike-in scaling (R)..."
 cd "$REPO_DIR" && Rscript "$CHIP_SCRIPTS/04a_diffbind_scale.R" && cd "$INSTALL_DIR"
@@ -811,7 +804,7 @@ cd "$REPO_DIR" && Rscript "$CHIP_SCRIPTS/04a_diffbind_scale.R" && cd "$INSTALL_D
 log "ChIP 4b/5: Generating spike-in bigwigs (bin: ${CHIP_BIGWIG_BIN}bp)..."
 bash "$CHIP_SCRIPTS/04b_bamcoverage.sh" \
     "$CHIP_DIR/cleanbams" \
-    "$DATA_DIR/ChIP_spikein_scalefactors.csv" \
+    "$DATA_DIR/ChIPseq_ASCL1_scalefactors.txt" \
     "$THREADS" "$CHIP_BIGWIG_BIN"
 
 log "ChIP 5/5: Peak annotation (R)..."
