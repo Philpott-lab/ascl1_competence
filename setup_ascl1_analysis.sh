@@ -245,7 +245,6 @@ rna:
 YAML
 
     echo "config.yaml written to: $CONFIG_FILE"
-    echo "Edit paths.chip_input_matching before running the ChIP pipeline."
 fi
 
 
@@ -309,10 +308,11 @@ else
 if (!requireNamespace("BiocManager", quietly = TRUE))
     install.packages("BiocManager", repos = "https://cloud.r-project.org")
 
-cran_pkgs <- c("here", "tidyverse", "ggplot2", "cowplot", "yaml")
+cran_pkgs <- c("here", "tidyverse", "ggplot2", "cowplot", "yaml", "eulerr")
 bioc_pkgs <- c("DiffBind", "AnnotationHub", "GenomicRanges", "DESeq2",
                "ChIPseeker", "TxDb.Mmusculus.UCSC.mm39.knownGene",
-               "org.Mm.eg.db", "clusterProfiler", "PCAtools", "edgeR", "tximport")
+               "org.Mm.eg.db", "clusterProfiler", "PCAtools", "edgeR", "tximport",
+               "BSgenome.Mmusculus.UCSC.mm39", "rtracklayer", "GenomicInteractions")
 
 for (pkg in cran_pkgs) {
     if (!requireNamespace(pkg, quietly = TRUE)) {
@@ -385,6 +385,7 @@ OUTDIR="$MAINDIR/kallisto"
 QCDIR="$MAINDIR/initialfastqc"
 TRIMDIR="$MAINDIR/trimming"
 KALLISTO_BOOTSTRAPS="$(yq '.rna.kallisto_bootstraps' "$CONFIG")"
+THREADS="$(yq '.compute.threads' "$CONFIG")"
 
 mkdir -p "$OUTDIR" "$QCDIR" "$TRIMDIR"
 
@@ -873,8 +874,7 @@ echo "   ├── run_rnaseq_hdaci.sh    ← exp3 (paired-end, dynamic sample l
 echo "   └── run_rnaseq_phox2b.sh  ← phox2b (single-end)"
 echo ""
 echo " Before running:"
-echo "   1. Set paths.chip_input_matching in config.yaml"
-echo "   2. Commit config.yaml to git"
+echo "   1. Commit config.yaml to git"
 echo ""
 echo " To run:"
 echo "   bash $RUN_SCRIPT [--atac-only | --chip-only | --rna-only]"
