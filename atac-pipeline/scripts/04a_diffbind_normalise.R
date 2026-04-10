@@ -16,7 +16,7 @@
 # Samples from mESCs with Ascl1-GR-HA
 # 3 conditions: mESC, EpiLC, NE
 # 3 timepoints per condition: 0h, 6h, 24h after dexamethasone induction of Ascl1
-# DiffBind sample sheet expected at: ../Data/ATACseq/atacseq_diffbindSamples.csv
+# DiffBind sample sheet expected at: ../Data/atac-seq/atacseq_diffbindSamples.csv
 # Peak files expected as produced by 03_call_peaks.sh (MACS3, narrowPeak format)
 
 
@@ -52,7 +52,7 @@ library(GenomicRanges)
 ##                    1. Build DiffBind object and apply blacklist                 ##
 #####################################################################################
 
-atac_samples <- read.csv(here("../Data/ATACseq/atacseq_diffbindSamples.csv"))
+atac_samples <- read.csv(here("../Data/atac-seq/atacseq_diffbindSamples.csv"))
 
 # mm39 blacklist: DiffBind's built-in blacklist uses ENCODE regions but mm39 is not
 # yet available there. Instead we use the excluderanges resource via AnnotationHub.
